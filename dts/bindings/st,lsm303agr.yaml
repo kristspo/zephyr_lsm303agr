@@ -1,0 +1,19 @@
+
+description: LSM303AGR accelerometer and magnetometer 
+
+compatible: "st,lsm303agr"
+
+include: i2c-device.yaml
+
+properties:
+    irq-acc-gpios:
+      type: phandle-array
+      required: false
+      description: The INT1 and INT2 signal connections.
+        These signals are active-high as produced by the sensor.
+
+    irq-mag-gpios:
+      type: phandle-array
+      required: false
+      description: INT_MAG (DRDY) signal connection.
+        This signal can be configured as active-high or active-low as produced by the sensor.

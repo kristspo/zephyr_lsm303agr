@@ -1,0 +1,13 @@
+# LSM303AGR accelerometer and magnetometer configuration options
+
+menuconfig LSM303AGR
+	bool "LSM303AGR accelerometer and magnetometer sensor"
+	default y
+	depends on DT_HAS_ST_LSM303AGR_ENABLED
+	select I2C
+	help
+	  Enable driver for LSM303AGR accelerometer and magnetometer sensor.
+
+if LSM303AGR
+
+endif # LSM303AGR
