@@ -6,8 +6,89 @@ menuconfig LSM303AGR
 	depends on DT_HAS_ST_LSM303AGR_ENABLED
 	select I2C
 	help
-	  Enable driver for LSM303AGR accelerometer and magnetometer sensor.
+		Enable driver for LSM303AGR accelerometer and magnetometer sensor.
 
 if LSM303AGR
+
+# Accelerometer configuration settings
+
+choice LSM303AGR_ACC_OP_MODE
+	prompt "Operating mode of accelerometer block"
+	default LSM303AGR_ACC_OP_MODE_NORMAL
+	help
+		Initial accelerometer operation mode.
+
+config LSM303AGR_ACC_OP_MODE_HIGH_RES
+	bool "high resolution mode (12 bit)"
+
+config LSM303AGR_ACC_OP_MODE_NORMAL
+	bool "normal mode (10 bit)"
+
+config LSM303AGR_ACC_OP_MODE_LOW_POWER
+	bool "low power mode (8 bit)"
+
+endchoice
+
+choice LSM303AGR_ACC_RANGE
+	prompt "Accelerometer measurement range"
+	default LSM303AGR_ACC_RANGE_2G
+	help
+		Initial full scale range for acceleration values.
+
+config LSM303AGR_ACC_RANGE_2G
+	bool "+/-2g"
+
+config LSM303AGR_ACC_RANGE_4G
+	bool "+/-4g"
+
+config LSM303AGR_ACC_RANGE_8G
+	bool "+/-8g"
+
+config LSM303AGR_ACC_RANGE_16G
+	bool "+/-16g"
+
+endchoice
+
+choice LSM303AGR_ACC_ODR
+	prompt "Accelerometer data rate frequency"
+	default LSM303AGR_ACC_ODR_0
+	help
+		Initial accelerometer data rate frequency.
+
+config LSM303AGR_ACC_ODR_0
+	bool "Power down mode"
+
+config LSM303AGR_ACC_ODR_1
+	bool "1Hz"
+
+config LSM303AGR_ACC_ODR_2
+	bool "10Hz"
+
+config LSM303AGR_ACC_ODR_3
+	bool "25Hz"
+
+config LSM303AGR_ACC_ODR_4
+	bool "50Hz"
+
+config LSM303AGR_ACC_ODR_5
+	bool "100Hz"
+
+config LSM303AGR_ACC_ODR_6
+	bool "200Hz"
+
+config LSM303AGR_ACC_ODR_7
+	bool "400Hz"
+
+config LSM303AGR_ACC_ODR_8
+	bool "1.620KHz (low power mode only)"
+	depends on LSM303AGR_ACC_OPER_MODE_LOW_POWER
+
+config LSM303AGR_ACC_ODR_9
+	bool "1.344KHz or 5.376KHz (depending on operating mode)"
+
+endchoice
+
+config LSM303AGR_MEASURE_TEMPERATURE
+	bool "Enable internal temperature measurements"
 
 endif # LSM303AGR

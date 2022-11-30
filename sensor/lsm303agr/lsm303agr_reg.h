@@ -105,33 +105,6 @@ typedef struct
 
 #endif /* MEMS_SHARED_TYPES */
 
-#ifndef MEMS_UCF_SHARED_TYPES
-#define MEMS_UCF_SHARED_TYPES
-
-/** @defgroup    Generic address-data structure definition
-  * @brief       This structure is useful to load a predefined configuration
-  *              of a sensor.
-  *              You can create a sensor configuration by your own or using
-  *              Unico / Unicleo tools available on STMicroelectronics
-  *              web site.
-  *
-  * @{
-  *
-  */
-
-typedef struct
-{
-  uint8_t address;
-  uint8_t data;
-} ucf_line_t;
-
-/**
-  * @}
-  *
-  */
-
-#endif /* MEMS_UCF_SHARED_TYPES */
-
 /**
   * @}
   *
@@ -145,6 +118,9 @@ typedef struct
 /** Device Identification (Who am I) **/
 #define LSM303AGR_ID_XL            0x33U
 #define LSM303AGR_ID_MG            0x40U
+
+/** Register address auto increment bit **/
+#define LSM303AGR_AUTOINCR_ADDR    0x80U
 
 /**
   * @}

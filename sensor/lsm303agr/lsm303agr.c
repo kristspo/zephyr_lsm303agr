@@ -21,8 +21,70 @@ static const struct sensor_driver_api lsm303agr_driver_api = {
     .channel_get = lsm303agr_channel_get,
 };
 
-/* get lsm303agr register from sensor_attr value */
-lsm303agr_reg lsm303agr_reg_get(enum lsm303agr_attribute attr)
+/* initial configuration register values according to configuration options */
+const lsm303agr_reg_t ctrl_temp_cfg = {
+#ifdef CONFIG_LSM303AGR_MEASURE_TEMPERATURE
+    .temp_cfg_reg_a.temp_en = LSM303AGR_TEMP_ENABLE,
+#endif
+};
+
+const lsm303agr_reg_t ctrl_reg_1 = {
+    .ctrl_reg1_a.xen = 1,
+    .ctrl_reg1_a.yen = 1,
+    .ctrl_reg1_a.zen = 1,
+#ifdef CONFIG_LSM303AGR_ACC_OP_MODE_LOW_POWER
+    .ctrl_reg1_a.lpen = 1,
+#endif
+#ifdef CONFIG_LSM303AGR_ACC_ODR_1
+    .ctrl_reg1_a.odr = LSM303AGR_XL_ODR_1Hz,
+#endif
+#ifdef CONFIG_LSM303AGR_ACC_ODR_2
+    .ctrl_reg1_a.odr = LSM303AGR_XL_ODR_10Hz,
+#endif
+#ifdef CONFIG_LSM303AGR_ACC_ODR_3
+    .ctrl_reg1_a.odr = LSM303AGR_XL_ODR_25Hz,
+#endif
+#ifdef CONFIG_LSM303AGR_ACC_ODR_4
+    .ctrl_reg1_a.odr = LSM303AGR_XL_ODR_50Hz,
+#endif
+#ifdef CONFIG_LSM303AGR_ACC_ODR_5
+    .ctrl_reg1_a.odr = LSM303AGR_XL_ODR_100Hz,
+#endif
+#ifdef CONFIG_LSM303AGR_ACC_ODR_6
+    .ctrl_reg1_a.odr = LSM303AGR_XL_ODR_200Hz,
+#endif
+#ifdef CONFIG_LSM303AGR_ACC_ODR_7
+    .ctrl_reg1_a.odr = LSM303AGR_XL_ODR_400Hz,
+#endif
+#ifdef CONFIG_LSM303AGR_ACC_ODR_8
+    .ctrl_reg1_a.odr = LSM303AGR_XL_ODR_1kHz620_LP,
+#endif
+#ifdef CONFIG_LSM303AGR_ACC_ODR_9
+    .ctrl_reg1_a.odr = LSM303AGR_XL_ODR_1kHz344_NM_HP_5kHz376_LP,
+#endif
+};
+
+const lsm303agr_reg_t ctrl_reg_4 = {
+#ifdef CONFIG_LSM303AGR_ACC_OP_MODE_HIGH_RES
+    .ctrl_reg4_a.hr = 1,
+#endif
+#ifdef CONFIG_LSM303AGR_ACC_RANGE_2G
+    .ctrl_reg4_a.fs = LSM303AGR_2g,
+#endif
+#ifdef CONFIG_LSM303AGR_ACC_RANGE_4G
+    .ctrl_reg4_a.fs = LSM303AGR_4g,
+#endif
+#ifdef CONFIG_LSM303AGR_ACC_RANGE_8G
+    .ctrl_reg4_a.fs = LSM303AGR_8g,
+#endif
+#ifdef CONFIG_LSM303AGR_ACC_RANGE_16G
+    .ctrl_reg4_a.fs = LSM303AGR_16g,
+#endif
+    .ctrl_reg4_a.bdu = 1,
+};
+
+/* get lsm303agr accelerometer register from sensor_attr value */
+lsm303agr_reg lsm303agr_acc_reg_get(enum lsm303agr_attribute attr)
 {
     switch (attr)
     {
@@ -104,6 +166,16 @@ lsm303agr_reg lsm303agr_reg_get(enum lsm303agr_attribute attr)
     case ACT_DUR_A:
         return (lsm303agr_reg){LSM303AGR_ACT_DUR_A, true};
 
+    default:
+        return (lsm303agr_reg){0, 0};
+    };
+}
+
+/* get lsm303agr magnetometer register from sensor_attr value */
+lsm303agr_reg lsm303agr_mag_reg_get(enum lsm303agr_attribute attr)
+{
+    switch (attr)
+    {
     /* magnetometer registers */
     case OFFSET_X_REG_L_M:
         return (lsm303agr_reg){LSM303AGR_OFFSET_X_REG_L_M, true};
@@ -153,6 +225,32 @@ lsm303agr_reg lsm303agr_reg_get(enum lsm303agr_attribute attr)
     };
 }
 
+/* set accelerometer full scale multiplier value */
+const int16_t lsm303agr_acc_reg_to_scale[] = {
+    // multiplier is expressed in fixed point 12.4 format ;)
+    1563,  /* 97.6875  */
+    3126,  /* 195.375  */
+    6252,  /* 390.75   */
+    18756, /* 1172.25  */
+};
+
+/* convert accelerometer 12 bit raw reading to sensor value in 1/1000 g */
+void lsm303agr_acc_convert(int16_t raw_val, int16_t scale, int32_t *val)
+{
+    int32_t converted_val = ((raw_val * scale) >> 4) / 100;
+    *val = converted_val;
+}
+
+/* convert temperature raw reading to sensor_value data */
+void lsm303agr_temp_convert(uint8_t *raw_temp, struct sensor_value *val)
+{
+    // most significiant byte has signed integer relative temperature value in degrees
+    val->val1 = (int8_t)raw_temp[1];
+    // least significiant byte appears to have additional two bits of fractional part
+    // put this as decimal part with three digits in sensor_value.val2
+    val->val2 = (raw_temp[0] >> 6) * 250;
+}
+
 int lsm303agr_attr_get(const struct device *dev,
                        enum sensor_channel chan,
                        enum sensor_attribute attr,
@@ -169,7 +267,7 @@ int lsm303agr_attr_get(const struct device *dev,
     case SENSOR_CHAN_ACCEL_Y:
     case SENSOR_CHAN_ACCEL_Z:
     case SENSOR_CHAN_ACCEL_XYZ:
-        reg = lsm303agr_reg_get(attr);
+        reg = lsm303agr_acc_reg_get(attr);
         if (reg.addr == 0)
         {
             return -ENOTSUP;
@@ -191,7 +289,7 @@ int lsm303agr_attr_get(const struct device *dev,
     case SENSOR_CHAN_MAGN_Y:
     case SENSOR_CHAN_MAGN_Z:
     case SENSOR_CHAN_MAGN_XYZ:
-        reg = lsm303agr_reg_get(attr);
+        reg = lsm303agr_mag_reg_get(attr);
         if (reg.addr == 0)
         {
             return -ENOTSUP;
@@ -230,7 +328,7 @@ int lsm303agr_attr_set(const struct device *dev,
     case SENSOR_CHAN_ACCEL_Y:
     case SENSOR_CHAN_ACCEL_Z:
     case SENSOR_CHAN_ACCEL_XYZ:
-        reg = lsm303agr_reg_get(attr);
+        reg = lsm303agr_acc_reg_get(attr);
         if (reg.addr == 0 || !reg.write)
             return -ENOTSUP;
         else
@@ -240,7 +338,7 @@ int lsm303agr_attr_set(const struct device *dev,
     case SENSOR_CHAN_MAGN_Y:
     case SENSOR_CHAN_MAGN_Z:
     case SENSOR_CHAN_MAGN_XYZ:
-        reg = lsm303agr_reg_get(attr);
+        reg = lsm303agr_mag_reg_get(attr);
         if (reg.addr == 0 || !reg.write)
             return -ENOTSUP;
         else
@@ -257,22 +355,99 @@ int lsm303agr_channel_get(const struct device *dev,
                           enum sensor_channel chan,
                           struct sensor_value *val)
 {
+    struct lsm303agr_data *data = dev->data;
+    int read_start, read_end;
+
+    switch (chan)
+    {
+    case SENSOR_CHAN_DIE_TEMP:
+        lsm303agr_temp_convert(data->raw_temp, val);
+        return 0;
+
+    case SENSOR_CHAN_ACCEL_X:
+        read_start = read_end = 0;
+        break;
+
+    case SENSOR_CHAN_ACCEL_Y:
+        read_start = read_end = 1;
+        break;
+
+    case SENSOR_CHAN_ACCEL_Z:
+        read_start = read_end = 2;
+        break;
+
+    case SENSOR_CHAN_ACCEL_XYZ:
+    case SENSOR_CHAN_ALL:
+        read_start = 0;
+        read_end = 2;
+        break;
+
+    default:
+        return -ENOTSUP;
+    }
+
+    for (int z = read_start; z <= read_end; z++, val++)
+    {
+        val->val2 = 0;
+        lsm303agr_acc_convert(data->acc_sample.xyz[z] >> 4, data->acc_scale, &val->val1);
+    }
     return 0;
 }
 
 int lsm303agr_sample_fetch(const struct device *dev,
                            enum sensor_channel chan)
 {
-    return 0;
+    const struct lsm303agr_config *cfg = dev->config;
+    struct lsm303agr_data *data = dev->data;
+    int status;
+
+    switch (chan)
+    {
+    case SENSOR_CHAN_ALL:
+    case SENSOR_CHAN_ACCEL_XYZ:
+    case SENSOR_CHAN_ACCEL_X:
+    case SENSOR_CHAN_ACCEL_Y:
+    case SENSOR_CHAN_ACCEL_Z:
+        status = lsm303agr_read_reg(&cfg->i2c_acc, LSM303AGR_STATUS_REG_A | LSM303AGR_AUTOINCR_ADDR, data->acc_sample.raw_xyz, 7);
+        if (status < 0)
+            return status;
+        // check data available bit in status register
+        switch (chan)
+        {
+        case SENSOR_CHAN_ACCEL_X:
+            return (data->acc_sample.status & BIT(0)) ? 0 : -ENODATA;
+        case SENSOR_CHAN_ACCEL_Y:
+            return (data->acc_sample.status & BIT(1)) ? 0 : -ENODATA;
+        case SENSOR_CHAN_ACCEL_Z:
+            return (data->acc_sample.status & BIT(2)) ? 0 : -ENODATA;
+        case SENSOR_CHAN_ALL:
+        case SENSOR_CHAN_ACCEL_XYZ:
+            return (data->acc_sample.status & BIT(3)) ? 0 : -ENODATA;
+        default:
+            return -ENOTSUP;
+        }
+
+    case SENSOR_CHAN_DIE_TEMP:
+        // read internal temperature only if requested
+        status = lsm303agr_read_reg(&cfg->i2c_acc, LSM303AGR_OUT_TEMP_L_A | LSM303AGR_AUTOINCR_ADDR, data->raw_temp, 2);
+        return status;
+
+    default:
+        return -ENOTSUP;
+    }
 }
 
 static int lsm303agr_init(const struct device *dev)
 {
     const struct lsm303agr_config *cfg = dev->config;
+    struct lsm303agr_data *data = dev->data;
     int status;
     uint8_t id;
+    uint8_t raw[7];
 
     PRINT("\nSetup lsm303agr on %s\n", cfg->i2c->name);
+
+    /** Verify i2c state and read sensor chip id **/
 
     if (!device_is_ready(cfg->i2c))
         return -ENODEV;
@@ -297,10 +472,36 @@ static int lsm303agr_init(const struct device *dev)
         return -EINVAL;
     }
 
+    /** Accelerometer initialization **/
+
+    // Reset accelerometer control registers to default values
+    // Accelerometer block does not have reset pin or SW reset register
+    memset(raw, 0, sizeof(raw));
+    raw[0] = ctrl_temp_cfg.byte; // TEMP_CFG_REG_A
+    raw[1] = ctrl_reg_1.byte;    // CTRL_REG1_A
+    raw[4] = ctrl_reg_4.byte;    // CTRL_REG4_A
+
+    status = lsm303agr_write_reg(&cfg->i2c_acc, LSM303AGR_TEMP_CFG_REG_A | LSM303AGR_AUTOINCR_ADDR, raw, sizeof(raw));
+    if (status < 0)
+        return status;
+
+    // Read measurement output and status registers once to clear possible block read update state
+    // if previous reading was not completed before reset. This also clears random device data values.
+    status = lsm303agr_read_reg(&cfg->i2c_acc, LSM303AGR_STATUS_REG_A | LSM303AGR_AUTOINCR_ADDR, data->acc_sample.raw_xyz, 7);
+    if (status < 0)
+        return status;
+#ifdef CONFIG_LSM303AGR_MEASURE_TEMPERATURE
+    status = lsm303agr_read_reg(&cfg->i2c_acc, LSM303AGR_OUT_TEMP_L_A | LSM303AGR_AUTOINCR_ADDR, data->raw_temp, 2);
+    if (status < 0)
+        return status;
+#endif
+    data->acc_scale = lsm303agr_acc_reg_to_scale[ctrl_reg_4.ctrl_reg4_a.fs];
+
     return 0;
 }
 
 #define LSM303AGR_DEFINE(inst)                                      \
+    static struct lsm303agr_data lsm303agr_data_##inst;             \
     static const struct lsm303agr_config lsm303agr_cfg_##inst = {   \
         DEVICE_DT_GET(DT_BUS(DT_DRV_INST(inst))),                   \
         {                                                           \
@@ -314,7 +515,8 @@ static int lsm303agr_init(const struct device *dev)
             DT_REG_ADDR_BY_IDX(DT_DRV_INST(inst), 1),               \
         }};                                                         \
     DEVICE_DT_INST_DEFINE(inst, lsm303agr_init,                     \
-                          NULL, NULL, &lsm303agr_cfg_##inst,        \
+                          NULL, &lsm303agr_data_##inst,             \
+                          &lsm303agr_cfg_##inst,                    \
                           POST_KERNEL, CONFIG_SENSOR_INIT_PRIORITY, \
                           &lsm303agr_driver_api);
 
