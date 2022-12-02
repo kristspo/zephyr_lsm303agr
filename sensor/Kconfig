@@ -91,4 +91,20 @@ endchoice
 config LSM303AGR_MEASURE_TEMPERATURE
 	bool "Enable internal temperature measurements"
 
+# Magnetometer configuration settings
+
+choice LSM303AGR_MAG_OP_MODE
+	prompt "Operating mode of magnetometer block"
+	default LSM303AGR_MAG_OP_MODE_HIGH_RES
+	help
+		Initial magnetometer operation mode.
+
+config LSM303AGR_MAG_OP_MODE_HIGH_RES
+	bool "high resolution mode"
+
+config LSM303AGR_MAG_OP_MODE_LOW_POWER
+	bool "low power mode"
+
+endchoice
+
 endif # LSM303AGR

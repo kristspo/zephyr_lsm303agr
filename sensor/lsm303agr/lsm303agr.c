@@ -83,6 +83,20 @@ const lsm303agr_reg_t ctrl_reg_4 = {
     .ctrl_reg4_a.bdu = 1,
 };
 
+const lsm303agr_reg_t cfg_reg_a = {
+    .cfg_reg_a_m.md = LSM303AGR_IDLE_DEFAULT,
+#ifdef CONFIG_LSM303AGR_MAG_OP_MODE_LOW_POWER
+    .cfg_reg_a_m.lp = 1,
+#endif
+    .cfg_reg_a_m.reboot = 1,
+    .cfg_reg_a_m.comp_temp_en = 1,
+};
+
+const lsm303agr_reg_t cfg_reg_b = {
+    .cfg_reg_b_m.set_rst = 1,
+    .cfg_reg_b_m.off_canc_one_shot = 1,
+};
+
 /* get lsm303agr accelerometer register from sensor_attr value */
 lsm303agr_reg lsm303agr_acc_reg_get(enum lsm303agr_attribute attr)
 {
@@ -356,7 +370,10 @@ int lsm303agr_channel_get(const struct device *dev,
                           struct sensor_value *val)
 {
     struct lsm303agr_data *data = dev->data;
-    int read_start, read_end;
+    int read_start_a, read_end_a;
+    int read_start_m, read_end_m;
+    bool read_acc = false;
+    bool read_mag = false;
 
     switch (chan)
     {
@@ -365,32 +382,74 @@ int lsm303agr_channel_get(const struct device *dev,
         return 0;
 
     case SENSOR_CHAN_ACCEL_X:
-        read_start = read_end = 0;
+        read_acc = true;
+        read_start_a = read_end_a = 0;
         break;
 
     case SENSOR_CHAN_ACCEL_Y:
-        read_start = read_end = 1;
+        read_acc = true;
+        read_start_a = read_end_a = 1;
         break;
 
     case SENSOR_CHAN_ACCEL_Z:
-        read_start = read_end = 2;
+        read_acc = true;
+        read_start_a = read_end_a = 2;
         break;
 
     case SENSOR_CHAN_ACCEL_XYZ:
+        read_acc = true;
+        read_start_a = 0;
+        read_end_a = 2;
+        break;
+
+    case SENSOR_CHAN_MAGN_X:
+        read_mag = true;
+        read_start_m = read_end_m = 0;
+        break;
+
+    case SENSOR_CHAN_MAGN_Y:
+        read_mag = true;
+        read_start_m = read_end_m = 1;
+        break;
+
+    case SENSOR_CHAN_MAGN_Z:
+        read_mag = true;
+        read_start_m = read_end_m = 2;
+        break;
+
+    case SENSOR_CHAN_MAGN_XYZ:
+        read_mag = true;
+        read_start_m = 0;
+        read_end_m = 2;
+        break;
+
     case SENSOR_CHAN_ALL:
-        read_start = 0;
-        read_end = 2;
+        read_acc = read_mag = true;
+        read_start_a = read_start_m = 0;
+        read_end_a = read_end_m = 2;
         break;
 
     default:
         return -ENOTSUP;
     }
 
-    for (int z = read_start; z <= read_end; z++, val++)
+    if (read_acc)
     {
-        val->val2 = 0;
-        lsm303agr_acc_convert(data->acc_sample.xyz[z] >> 4, data->acc_scale, &val->val1);
+        for (int z = read_start_a; z <= read_end_a; z++, val++)
+        {
+            val->val2 = 0;
+            lsm303agr_acc_convert(data->acc_sample.xyz[z] >> 4, data->acc_conv_scale, &val->val1);
+        }
     }
+    if (read_mag)
+    {
+        for (int z = read_start_m; z <= read_end_m; z++, val++)
+        {
+            val->val2 = 0;
+            val->val1 = (data->mag_sample.xyz[z] * 3) >> 1; // 1 LSB is 1.5 milli gauss
+        }
+    }
+
     return 0;
 }
 
@@ -399,6 +458,8 @@ int lsm303agr_sample_fetch(const struct device *dev,
 {
     const struct lsm303agr_config *cfg = dev->config;
     struct lsm303agr_data *data = dev->data;
+    lsm303agr_sample raw_mag;
+    bool newsample = true;
     int status;
 
     switch (chan)
@@ -415,17 +476,62 @@ int lsm303agr_sample_fetch(const struct device *dev,
         switch (chan)
         {
         case SENSOR_CHAN_ACCEL_X:
-            return (data->acc_sample.status & BIT(0)) ? 0 : -ENODATA;
+            newsample = newsample && (data->acc_sample.status & BIT(0));
         case SENSOR_CHAN_ACCEL_Y:
-            return (data->acc_sample.status & BIT(1)) ? 0 : -ENODATA;
+            newsample = newsample && (data->acc_sample.status & BIT(1));
         case SENSOR_CHAN_ACCEL_Z:
-            return (data->acc_sample.status & BIT(2)) ? 0 : -ENODATA;
-        case SENSOR_CHAN_ALL:
-        case SENSOR_CHAN_ACCEL_XYZ:
-            return (data->acc_sample.status & BIT(3)) ? 0 : -ENODATA;
+            newsample = newsample && (data->acc_sample.status & BIT(2));
         default:
-            return -ENOTSUP;
+            newsample = newsample && (data->acc_sample.status & BIT(3));
         }
+        if (chan != SENSOR_CHAN_ALL)
+            return newsample ? 0 : -ENODATA;
+
+    case SENSOR_CHAN_MAGN_XYZ:
+    case SENSOR_CHAN_MAGN_X:
+    case SENSOR_CHAN_MAGN_Y:
+    case SENSOR_CHAN_MAGN_Z:
+        if (data->mag_single_shot)
+        {
+            status = lsm303agr_mag_operating_mode_set(&cfg->i2c_mag, LSM303AGR_SINGLE_TRIGGER);
+            if (status < 0)
+                return status;
+            k_msleep(15);
+            status = lsm303agr_read_reg(&cfg->i2c_mag, LSM303AGR_STATUS_REG_M | LSM303AGR_AUTOINCR_ADDR, raw_mag.raw_xyz, 7);
+            if (status < 0)
+                return status;
+            status = lsm303agr_mag_operating_mode_set(&cfg->i2c_mag, LSM303AGR_SINGLE_TRIGGER);
+            if (status < 0)
+                return status;
+            k_msleep(15);
+        }
+        status = lsm303agr_read_reg(&cfg->i2c_mag, LSM303AGR_STATUS_REG_M | LSM303AGR_AUTOINCR_ADDR, data->mag_sample.raw_xyz, 7);
+        if (status < 0)
+            return status;
+        if (data->mag_single_shot)
+        {
+            // refer to AN5069 section Magnetometer offset cancellation
+            data->mag_sample.xyz[0] += raw_mag.xyz[0];
+            data->mag_sample.xyz[1] += raw_mag.xyz[1];
+            data->mag_sample.xyz[2] += raw_mag.xyz[2];
+            data->mag_sample.xyz[0] >>= 1;
+            data->mag_sample.xyz[1] >>= 1;
+            data->mag_sample.xyz[2] >>= 1;
+        }
+
+        // check data available bit in status register
+        switch (chan)
+        {
+        case SENSOR_CHAN_MAGN_X:
+            newsample = newsample && (data->mag_sample.status & BIT(0));
+        case SENSOR_CHAN_MAGN_Y:
+            newsample = newsample && (data->mag_sample.status & BIT(1));
+        case SENSOR_CHAN_MAGN_Z:
+            newsample = newsample && (data->mag_sample.status & BIT(2));
+        default:
+            newsample = newsample && (data->mag_sample.status & BIT(3));
+        }
+        return newsample ? 0 : -ENODATA;
 
     case SENSOR_CHAN_DIE_TEMP:
         // read internal temperature only if requested
@@ -495,7 +601,31 @@ static int lsm303agr_init(const struct device *dev)
     if (status < 0)
         return status;
 #endif
-    data->acc_scale = lsm303agr_acc_reg_to_scale[ctrl_reg_4.ctrl_reg4_a.fs];
+    data->acc_conv_scale = lsm303agr_acc_reg_to_scale[ctrl_reg_4.ctrl_reg4_a.fs];
+
+    /** Magnetometer initialization **/
+
+    // Set soft reset bit
+    status = lsm303agr_mag_reset_set(&cfg->i2c_mag, true);
+    if (status < 0)
+        return status;
+
+    k_busy_wait(5);
+
+    // Set default configuration
+    id = cfg_reg_a.byte;
+    status = lsm303agr_write_reg(&cfg->i2c_mag, LSM303AGR_CFG_REG_A_M, &id, 1);
+    if (status < 0)
+        return status;
+
+    k_busy_wait(20);
+
+    id = cfg_reg_b.byte;
+    status = lsm303agr_write_reg(&cfg->i2c_mag, LSM303AGR_CFG_REG_B_M, &id, 1);
+    if (status < 0)
+        return status;
+
+    data->mag_single_shot = cfg_reg_a.cfg_reg_a_m.md;
 
     return 0;
 }

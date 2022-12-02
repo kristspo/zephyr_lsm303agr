@@ -1,4 +1,14 @@
 
+### 02 Dec 2022
+
+Add `sensor_sample_fetch` and `sensor_channel_get` functions to read LSM303AGR magnetometer block. Channels `SENSOR_CHAN_MAGN_X`, `SENSOR_CHAN_MAGN_Y`, `SENSOR_CHAN_MAGN_Z`, `SENSOR_CHAN_MAGN_XYZ` are supported. Using `sensor_channel_get` with `SENSOR_CHAN_ALL` will return accelerometer and magnetometer readings by setting six `sensor_value` variables.
+
+**Kconfig options implemented to set initial state of magnetometer:**
+
+Magnetometer operating mode: \
+`LSM303AGR_MAG_OP_MODE_HIGH_RES` (default value if not set) \
+`LSM303AGR_MAG_OP_MODE_LOW_POWER`
+
 ### 30 Nov 2022
 
 Add `sensor_sample_fetch` and `sensor_channel_get` functions to read LSM303AGR accelerometer block. Channels `SENSOR_CHAN_ACCEL_X`, `SENSOR_CHAN_ACCEL_Y`, `SENSOR_CHAN_ACCEL_Z`, `SENSOR_CHAN_ACCEL_XYZ` are supported.

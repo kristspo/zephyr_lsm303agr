@@ -11,18 +11,22 @@ struct lsm303agr_config
     const struct i2c_dt_spec i2c_mag;
 };
 
+typedef union lsm303agr_sample_type
+{
+    uint8_t raw_xyz[7];
+    struct
+    {
+        uint8_t status;
+        int16_t xyz[3];
+    } __packed;
+} lsm303agr_sample;
+
 struct lsm303agr_data
 {
-    union
-    {
-        uint8_t raw_xyz[7];
-        struct
-        {
-            uint8_t status;
-            int16_t xyz[3];
-        } __packed;
-    } acc_sample;
-    int16_t acc_scale;
+    lsm303agr_sample acc_sample;
+    lsm303agr_sample mag_sample;
+    int16_t acc_conv_scale;
+    bool mag_single_shot;
     uint8_t raw_temp[2];
 };
 

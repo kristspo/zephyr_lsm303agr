@@ -1146,6 +1146,7 @@ typedef enum
   LSM303AGR_CONTINUOUS_MODE  = 0,
   LSM303AGR_SINGLE_TRIGGER   = 1,
   LSM303AGR_POWER_DOWN       = 2,
+  LSM303AGR_IDLE_DEFAULT     = 3,
 } lsm303agr_md_m_t;
 int32_t lsm303agr_mag_operating_mode_set(const struct i2c_dt_spec * ctx,
                                          lsm303agr_md_m_t val);
