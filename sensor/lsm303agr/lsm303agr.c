@@ -560,6 +560,8 @@ int lsm303agr_init(const struct device *dev)
 
     /* Recover I2C bus */
     status = i2c_recover_bus(cfg->i2c_acc.bus);
+    if (status < 0)
+        return status;
 
     status = lsm303agr_xl_device_id_get(&cfg->i2c_acc, &id);
     if (status < 0)
