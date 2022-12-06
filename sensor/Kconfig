@@ -81,7 +81,7 @@ config LSM303AGR_ACC_ODR_7
 
 config LSM303AGR_ACC_ODR_8
 	bool "1.620KHz (low power mode only)"
-	depends on LSM303AGR_ACC_OPER_MODE_LOW_POWER
+	depends on LSM303AGR_ACC_OP_MODE_LOW_POWER
 
 config LSM303AGR_ACC_ODR_9
 	bool "1.344KHz or 5.376KHz (depending on operating mode)"

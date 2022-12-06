@@ -6,12 +6,6 @@ LOG_MODULE_REGISTER(lsm303agr, CONFIG_SENSOR_LOG_LEVEL);
 #include "lsm303agr_attr.h"
 #include "lsm303agr_reg.h"
 
-#if CONFIG_LOG
-#define PRINT(...) LOG_PRINTK(__VA_ARGS__)
-#else
-#define PRINT(...) (void)0
-#endif
-
 #define DT_DRV_COMPAT st_lsm303agr
 
 static const struct sensor_driver_api lsm303agr_driver_api = {
@@ -543,7 +537,7 @@ int lsm303agr_sample_fetch(const struct device *dev,
     }
 }
 
-static int lsm303agr_init(const struct device *dev)
+int lsm303agr_init(const struct device *dev)
 {
     const struct lsm303agr_config *cfg = dev->config;
     struct lsm303agr_data *data = dev->data;
@@ -552,6 +546,12 @@ static int lsm303agr_init(const struct device *dev)
     uint8_t raw[7];
 
     PRINT("\nSetup lsm303agr on %s\n", cfg->i2c->name);
+    if (cfg->gpio_acc_int1.port)
+        PRINT("Interrupt pin %s %d \n", cfg->gpio_acc_int1.port->name, cfg->gpio_acc_int1.pin);
+    if (cfg->gpio_acc_int2.port)
+        PRINT("Interrupt pin %s %d \n", cfg->gpio_acc_int2.port->name, cfg->gpio_acc_int2.pin);
+    if (cfg->gpio_mag_int0.port)
+        PRINT("Interrupt pin %s %d \n", cfg->gpio_mag_int0.port->name, cfg->gpio_mag_int0.pin);
 
     /** Verify i2c state and read sensor chip id **/
 
@@ -627,8 +627,20 @@ static int lsm303agr_init(const struct device *dev)
 
     data->mag_single_shot = cfg_reg_a.cfg_reg_a_m.md;
 
+    if (cfg->gpio_acc_int1.port || cfg->gpio_acc_int2.port || cfg->gpio_mag_int0.port)
+    {
+        status = lsm303agr_init_gpios(dev);
+        if (status < 0)
+            return status;
+    }
+
     return 0;
 }
+
+#define GPIO_DT_SPEC_INST_GET_BY_IDX_COND(id, prop, idx)       \
+    COND_CODE_1(DT_INST_PROP_HAS_IDX(id, prop, idx),           \
+                (GPIO_DT_SPEC_INST_GET_BY_IDX(id, prop, idx)), \
+                ({.port = NULL, .pin = 0, .dt_flags = 0}))
 
 #define LSM303AGR_DEFINE(inst)                                      \
     static struct lsm303agr_data lsm303agr_data_##inst;             \
@@ -643,7 +655,11 @@ static int lsm303agr_init(const struct device *dev)
             /* I2C definition for magnetometer */                   \
             DEVICE_DT_GET(DT_BUS(DT_DRV_INST(inst))),               \
             DT_REG_ADDR_BY_IDX(DT_DRV_INST(inst), 1),               \
-        }};                                                         \
+        },                                                          \
+        GPIO_DT_SPEC_INST_GET_BY_IDX_COND(inst, irq_acc_gpios, 0),  \
+        GPIO_DT_SPEC_INST_GET_BY_IDX_COND(inst, irq_acc_gpios, 1),  \
+        GPIO_DT_SPEC_INST_GET_BY_IDX_COND(inst, irq_mag_gpios, 0),  \
+    };                                                              \
     DEVICE_DT_INST_DEFINE(inst, lsm303agr_init,                     \
                           NULL, &lsm303agr_data_##inst,             \
                           &lsm303agr_cfg_##inst,                    \
