@@ -558,10 +558,12 @@ int lsm303agr_init(const struct device *dev)
     if (!device_is_ready(cfg->i2c))
         return -ENODEV;
 
+#ifdef CONFIG_LSM303AGR_RESET_I2C
     /* Recover I2C bus */
     status = i2c_recover_bus(cfg->i2c_acc.bus);
     if (status < 0)
         return status;
+#endif
 
     status = lsm303agr_xl_device_id_get(&cfg->i2c_acc, &id);
     if (status < 0)

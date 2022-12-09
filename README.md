@@ -1,4 +1,8 @@
 
+### 09 Dec 2022
+
+Add `LSM303AGR_RESET_I2C` configuration option to use I2C recover function at driver startup.
+
 ### 02 Dec 2022
 
 Add `sensor_sample_fetch` and `sensor_channel_get` functions to read LSM303AGR magnetometer block. Channels `SENSOR_CHAN_MAGN_X`, `SENSOR_CHAN_MAGN_Y`, `SENSOR_CHAN_MAGN_Z`, `SENSOR_CHAN_MAGN_XYZ` are supported. Using `sensor_channel_get` with `SENSOR_CHAN_ALL` will return accelerometer and magnetometer readings by setting six `sensor_value` variables.

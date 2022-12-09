@@ -10,6 +10,9 @@ menuconfig LSM303AGR
 
 if LSM303AGR
 
+config LSM303AGR_RESET_I2C
+	bool "Recover I2C bus at start of driver initialization"
+
 # Accelerometer configuration settings
 
 choice LSM303AGR_ACC_OP_MODE
