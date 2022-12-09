@@ -10,21 +10,47 @@ void lsm303agr_acc_int1_callback(const struct device *port,
                                  struct gpio_callback *cb,
                                  uint32_t pins)
 {
-    PRINT(" pin change %08x \n", pins);
+    struct lsm303agr_data *data = CONTAINER_OF(cb, struct lsm303agr_data, gpio_acc_int1_cb);
+    data->status.acc_int1 = 1;
+    k_work_submit(&data->work);
 }
 
 void lsm303agr_acc_int2_callback(const struct device *port,
                                  struct gpio_callback *cb,
                                  uint32_t pins)
 {
-    PRINT(" pin change %08x \n", pins);
+    struct lsm303agr_data *data = CONTAINER_OF(cb, struct lsm303agr_data, gpio_acc_int2_cb);
+    data->status.acc_int2 = 1;
+    k_work_submit(&data->work);
 }
 
 void lsm303agr_mag_int0_callback(const struct device *port,
                                  struct gpio_callback *cb,
                                  uint32_t pins)
 {
-    PRINT(" pin change %08x \n", pins);
+    struct lsm303agr_data *data = CONTAINER_OF(cb, struct lsm303agr_data, gpio_mag_int0_cb);
+    data->status.mag_int0 = 1;
+    k_work_submit(&data->work);
+}
+
+void lsm303agr_work_cb(struct k_work *work)
+{
+    struct lsm303agr_data *data = CONTAINER_OF(work, struct lsm303agr_data, work);
+
+    if (data->status.acc_int1)
+    {
+        data->status.acc_int1 = 0;
+    }
+
+    if (data->status.acc_int2)
+    {
+        data->status.acc_int2 = 0;
+    }
+
+    if (data->status.mag_int0)
+    {
+        data->status.mag_int0 = 0;
+    }
 }
 
 int lsm303agr_gpio_config(const struct gpio_dt_spec *gpio,
@@ -54,14 +80,17 @@ int lsm303agr_gpio_config(const struct gpio_dt_spec *gpio,
         return status;
     }
 
-    status = gpio_pin_interrupt_configure_dt(gpio, GPIO_INT_EDGE_TO_ACTIVE);
-    if (status < 0)
-    {
-        PRINT("Failed to configure interrupt %s %d \n", gpio->port->name, gpio->pin);
-        return status;
-    }
-
     return 0;
+}
+
+int lsm303agr_gpio_int_set(const struct gpio_dt_spec *gpio,
+                           gpio_flags_t flags)
+{
+    int status = gpio_pin_interrupt_configure_dt(gpio, flags);
+    if (status < 0)
+        PRINT("Failed to set interrupt %s %d \n", gpio->port->name, gpio->pin);
+
+    return status;
 }
 
 int lsm303agr_init_gpios(const struct device *dev)
@@ -88,6 +117,8 @@ int lsm303agr_init_gpios(const struct device *dev)
         if (status < 0)
             return status;
     }
+
+    data->work.handler = lsm303agr_work_cb;
 
     return 0;
 }

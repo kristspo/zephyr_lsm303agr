@@ -11,6 +11,7 @@ LOG_MODULE_REGISTER(lsm303agr, CONFIG_SENSOR_LOG_LEVEL);
 static const struct sensor_driver_api lsm303agr_driver_api = {
     .attr_set = lsm303agr_attr_set,
     .attr_get = lsm303agr_attr_get,
+    .trigger_set = lsm303agr_trigger_set,
     .sample_fetch = lsm303agr_sample_fetch,
     .channel_get = lsm303agr_channel_get,
 };
@@ -485,7 +486,7 @@ int lsm303agr_sample_fetch(const struct device *dev,
     case SENSOR_CHAN_MAGN_X:
     case SENSOR_CHAN_MAGN_Y:
     case SENSOR_CHAN_MAGN_Z:
-        if (data->mag_single_shot)
+        if (data->status.mag_single_shot)
         {
             status = lsm303agr_mag_operating_mode_set(&cfg->i2c_mag, LSM303AGR_SINGLE_TRIGGER);
             if (status < 0)
@@ -502,7 +503,7 @@ int lsm303agr_sample_fetch(const struct device *dev,
         status = lsm303agr_read_reg(&cfg->i2c_mag, LSM303AGR_STATUS_REG_M | LSM303AGR_AUTOINCR_ADDR, data->mag_sample.raw_xyz, 7);
         if (status < 0)
             return status;
-        if (data->mag_single_shot)
+        if (data->status.mag_single_shot)
         {
             // refer to AN5069 section Magnetometer offset cancellation
             data->mag_sample.xyz[0] += raw_mag.xyz[0];
@@ -531,6 +532,76 @@ int lsm303agr_sample_fetch(const struct device *dev,
         // read internal temperature only if requested
         status = lsm303agr_read_reg(&cfg->i2c_acc, LSM303AGR_OUT_TEMP_L_A | LSM303AGR_AUTOINCR_ADDR, data->raw_temp, 2);
         return status;
+
+    default:
+        return -ENOTSUP;
+    }
+}
+
+int lsm303agr_trigger_set(const struct device *dev,
+                          const struct sensor_trigger *trig,
+                          sensor_trigger_handler_t handler)
+{
+    const struct lsm303agr_config *cfg = dev->config;
+    struct lsm303agr_data *data = dev->data;
+    int status;
+
+    uint16_t trig_type = (trig->type & 0x00FF);
+    uint8_t trig_bits = (trig->type >> 8);
+
+    switch (trig->chan)
+    {
+    case SENSOR_CHAN_ACCEL_X:
+    case SENSOR_CHAN_ACCEL_Y:
+    case SENSOR_CHAN_ACCEL_Z:
+    case SENSOR_CHAN_ACCEL_XYZ:
+        switch (trig_type)
+        {
+        case TRIG_ACC_INT1:
+            if (cfg->gpio_acc_int1.port)
+            {
+                // set INT1 configuration register
+                status = lsm303agr_write_reg(&cfg->i2c_acc, LSM303AGR_CTRL_REG3_A, &trig_bits, 1);
+                if (status < 0)
+                    return status;
+
+                // set gpio pin interrupt
+                status = lsm303agr_gpio_int_set(&cfg->gpio_acc_int1, (trig_bits && handler) ? GPIO_INT_EDGE_TO_ACTIVE : GPIO_INT_DISABLE);
+                if (status < 0)
+                    return status;
+
+                return 0;
+            }
+            else
+            {
+                LOG_ERR("INT1 pin not defined in device tree");
+                return -ENODEV;
+            }
+
+        case TRIG_ACC_INT2:
+            if (cfg->gpio_acc_int2.port)
+            {
+                // set INT2 configuration register
+                status = lsm303agr_write_reg(&cfg->i2c_acc, LSM303AGR_CTRL_REG6_A, &trig_bits, 1);
+                if (status < 0)
+                    return status;
+
+                // set gpio pin interrupt
+                status = lsm303agr_gpio_int_set(&cfg->gpio_acc_int2, (trig_bits && handler) ? GPIO_INT_EDGE_TO_ACTIVE : GPIO_INT_DISABLE);
+                if (status < 0)
+                    return status;
+
+                return 0;
+            }
+            else
+            {
+                LOG_ERR("INT2 pin not defined in device tree");
+                return -ENODEV;
+            }
+
+        default:
+            return -ENOTSUP;
+        }
 
     default:
         return -ENOTSUP;
@@ -632,7 +703,7 @@ int lsm303agr_init(const struct device *dev)
     if (status < 0)
         return status;
 
-    data->mag_single_shot = cfg_reg_a.cfg_reg_a_m.md;
+    data->status.mag_single_shot = (bool)cfg_reg_a.cfg_reg_a_m.md;
 
     if (cfg->gpio_acc_int1.port || cfg->gpio_acc_int2.port || cfg->gpio_mag_int0.port)
     {

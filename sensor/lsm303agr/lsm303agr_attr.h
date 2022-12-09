@@ -79,6 +79,38 @@ extern "C"
         MAG_ATTR_END,
     };
 
+    // LSM303AGR specific trigger types
+    enum lsm303agr_trigger
+    {
+        TRIG_ACC_INT1 = SENSOR_TRIG_PRIV_START,
+        TRIG_ACC_INT2,
+        TRIG_MAG_INT,
+    };
+
+#define BIT_ACC_INT_CLICK BIT(7)
+#define BIT_ACC_INT_AOI1 BIT(6)
+#define BIT_ACC_INT_AOI2 BIT(5)
+
+#define TRIGGER_BITS(x) (x << 8)
+
+// accelerometer INT1 and INT2 configuration bits
+#define BIT_ACC_CFG_AND_EVT BIT(7)
+#define BIT_ACC_CFG_6D_EVT BIT(6)
+#define BIT_ACC_CFG_Z_HI_UP BIT(5)
+#define BIT_ACC_CFG_Z_LO_DOWN BIT(4)
+#define BIT_ACC_CFG_Y_HI_UP BIT(3)
+#define BIT_ACC_CFG_Y_LO_DOWN BIT(2)
+#define BIT_ACC_CFG_X_HI_UP BIT(1)
+#define BIT_ACC_CFG_X_LO_DOWN BIT(0)
+
+// accelerometer CLICK_CFG configuration bits
+#define BIT_ACC_CFG_Z_D_CLICK BIT(5)
+#define BIT_ACC_CFG_Z_S_CLICK BIT(4)
+#define BIT_ACC_CFG_Y_D_CLICK BIT(3)
+#define BIT_ACC_CFG_Y_S_CLICK BIT(2)
+#define BIT_ACC_CFG_X_D_CLICK BIT(1)
+#define BIT_ACC_CFG_X_S_CLICK BIT(0)
+
 #ifdef __cplusplus
 }
 #endif

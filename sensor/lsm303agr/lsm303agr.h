@@ -31,17 +31,26 @@ typedef union lsm303agr_sample_type
     } __packed;
 } lsm303agr_sample;
 
+typedef struct lsm303agr_status_type
+{
+    uint8_t acc_int1 : 1;
+    uint8_t acc_int2 : 1;
+    uint8_t mag_int0 : 1;
+    uint8_t mag_single_shot : 1;
+} lsm303agr_status;
+
 struct lsm303agr_data
 {
     lsm303agr_sample acc_sample;
     lsm303agr_sample mag_sample;
     int16_t acc_conv_scale;
-    bool mag_single_shot;
     uint8_t raw_temp[2];
 
+    lsm303agr_status status;
     struct gpio_callback gpio_acc_int1_cb;
     struct gpio_callback gpio_acc_int2_cb;
     struct gpio_callback gpio_mag_int0_cb;
+    struct k_work work;
 };
 
 typedef struct lsm303agr_reg_type
@@ -67,6 +76,13 @@ int lsm303agr_channel_get(const struct device *dev,
 int lsm303agr_sample_fetch(const struct device *dev,
                            enum sensor_channel chan);
 
+int lsm303agr_trigger_set(const struct device *dev,
+                          const struct sensor_trigger *trig,
+                          sensor_trigger_handler_t handler);
+
 int lsm303agr_init_gpios(const struct device *dev);
+
+int lsm303agr_gpio_int_set(const struct gpio_dt_spec *gpio,
+                           gpio_flags_t flags);
 
 #endif
