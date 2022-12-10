@@ -39,6 +39,12 @@ typedef struct lsm303agr_status_type
     uint8_t mag_single_shot : 1;
 } lsm303agr_status;
 
+typedef struct lsm303agr_trig_type
+{
+    uint8_t enable; // bit(s) of enabled interrupts
+    sensor_trigger_handler_t handler;
+} lsm303agr_trig;
+
 struct lsm303agr_data
 {
     lsm303agr_sample acc_sample;
@@ -50,6 +56,10 @@ struct lsm303agr_data
     struct gpio_callback gpio_acc_int1_cb;
     struct gpio_callback gpio_acc_int2_cb;
     struct gpio_callback gpio_mag_int0_cb;
+    lsm303agr_trig acc_int1;
+    lsm303agr_trig acc_int2;
+    lsm303agr_trig mag_int0;
+    const struct device *dev;
     struct k_work work;
 };
 
@@ -58,6 +68,16 @@ typedef struct lsm303agr_reg_type
     uint16_t addr;
     bool write;
 } lsm303agr_reg;
+
+enum lsm303agr_int
+{
+    INT_CLICK,
+    INT_AOI_1,
+    INT_AOI_2,
+    INT_ACT,
+    INT_FIFO_WTM,
+    INT_FIFO_OVR,
+};
 
 int lsm303agr_attr_get(const struct device *dev,
                        enum sensor_channel chan,

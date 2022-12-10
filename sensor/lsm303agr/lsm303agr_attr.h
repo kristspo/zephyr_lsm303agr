@@ -90,8 +90,16 @@ extern "C"
 #define BIT_ACC_INT_CLICK BIT(7)
 #define BIT_ACC_INT_AOI1 BIT(6)
 #define BIT_ACC_INT_AOI2 BIT(5)
+#define BIT_ACC_INT_ACT BIT(3)
+#define BIT_ACC_INT_FIFO_WTM BIT(2)
+#define BIT_ACC_INT_FIFO_OVR BIT(1)
 
-#define TRIGGER_BITS(x) (x << 8)
+#define ALLOW_BITS_ACC_INT1 (BIT_ACC_INT_CLICK | BIT_ACC_INT_AOI1 | BIT_ACC_INT_AOI2 | BIT_ACC_INT_FIFO_WTM | BIT_ACC_INT_FIFO_OVR)
+#define ALLOW_BITS_ACC_INT2 (BIT_ACC_INT_CLICK | BIT_ACC_INT_AOI1 | BIT_ACC_INT_AOI2 | BIT_ACC_INT_ACT)
+
+#define TRIGGER_BITS_SET(x) (x << 8)
+#define TRIGGER_BITS_GET(x) (x & 0x00FF)
+#define TRIGGER_SRC_GET(x) (x >> 8)
 
 // accelerometer INT1 and INT2 configuration bits
 #define BIT_ACC_CFG_AND_EVT BIT(7)

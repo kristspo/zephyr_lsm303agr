@@ -560,17 +560,24 @@ int lsm303agr_trigger_set(const struct device *dev,
         case TRIG_ACC_INT1:
             if (cfg->gpio_acc_int1.port)
             {
-                // set INT1 configuration register
-                status = lsm303agr_write_reg(&cfg->i2c_acc, LSM303AGR_CTRL_REG3_A, &trig_bits, 1);
-                if (status < 0)
-                    return status;
+                if ((trig_bits == 0x00) || (trig_bits & ALLOW_BITS_ACC_INT1))
+                {
+                    // set INT1 configuration register
+                    status = lsm303agr_write_reg(&cfg->i2c_acc, LSM303AGR_CTRL_REG3_A, &trig_bits, 1);
+                    if (status < 0)
+                        return status;
 
-                // set gpio pin interrupt
-                status = lsm303agr_gpio_int_set(&cfg->gpio_acc_int1, (trig_bits && handler) ? GPIO_INT_EDGE_TO_ACTIVE : GPIO_INT_DISABLE);
-                if (status < 0)
-                    return status;
+                    data->acc_int1.enable = trig_bits;
+                    data->acc_int1.handler = handler;
+                    // set gpio pin interrupt
+                    status = lsm303agr_gpio_int_set(&cfg->gpio_acc_int1, (trig_bits && handler) ? GPIO_INT_EDGE_TO_ACTIVE : GPIO_INT_DISABLE);
+                    if (status < 0)
+                        return status;
 
-                return 0;
+                    return 0;
+                }
+                else
+                    return -ENOTSUP;
             }
             else
             {
@@ -581,17 +588,24 @@ int lsm303agr_trigger_set(const struct device *dev,
         case TRIG_ACC_INT2:
             if (cfg->gpio_acc_int2.port)
             {
-                // set INT2 configuration register
-                status = lsm303agr_write_reg(&cfg->i2c_acc, LSM303AGR_CTRL_REG6_A, &trig_bits, 1);
-                if (status < 0)
-                    return status;
+                if ((trig_bits == 0x00) || (trig_bits & ALLOW_BITS_ACC_INT2))
+                {
+                    // set INT2 configuration register
+                    status = lsm303agr_write_reg(&cfg->i2c_acc, LSM303AGR_CTRL_REG6_A, &trig_bits, 1);
+                    if (status < 0)
+                        return status;
 
-                // set gpio pin interrupt
-                status = lsm303agr_gpio_int_set(&cfg->gpio_acc_int2, (trig_bits && handler) ? GPIO_INT_EDGE_TO_ACTIVE : GPIO_INT_DISABLE);
-                if (status < 0)
-                    return status;
+                    data->acc_int2.enable = trig_bits;
+                    data->acc_int2.handler = handler;
+                    // set gpio pin interrupt
+                    status = lsm303agr_gpio_int_set(&cfg->gpio_acc_int2, (trig_bits && handler) ? GPIO_INT_EDGE_TO_ACTIVE : GPIO_INT_DISABLE);
+                    if (status < 0)
+                        return status;
 
-                return 0;
+                    return 0;
+                }
+                else
+                    return -ENOTSUP;
             }
             else
             {
