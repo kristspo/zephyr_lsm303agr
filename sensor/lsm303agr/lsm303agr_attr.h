@@ -87,6 +87,37 @@ extern "C"
         TRIG_MAG_INT,
     };
 
+    // LSM303AGR full scale and data rate values
+    enum lsm303agr_acc_range
+    {
+        ACC_RANGE_2G = 2,
+        ACC_RANGE_4G = 4,
+        ACC_RANGE_8G = 8,
+        ACC_RANGE_16G = 16,
+    };
+    enum lsm303agr_acc_odr
+    {
+        ACC_ODR_POWERDOWN = 0,
+        ACC_ODR_1Hz = 1,
+        ACC_ODR_10Hz = 10,
+        ACC_ODR_25Hz = 25,
+        ACC_ODR_50Hz = 50,
+        ACC_ODR_100Hz = 100,
+        ACC_ODR_200Hz = 200,
+        ACC_ODR_400Hz = 400,
+        ACC_ODR_1344Hz = 1344,    // setting this data rate will clear low power mode if active
+        ACC_ODR_1620Hz_LP = 1620, // setting this data rate will set low power operating mode
+        ACC_ODR_5376Hz_LP = 5376, // setting this data rate will set low power operating mode
+    };
+    enum lsm303agr_mag_odr
+    {
+        MAG_ODR_SINGLESHOT = 0,
+        MAG_ODR_10Hz = 10,
+        MAG_ODR_20Hz = 20,
+        MAG_ODR_50Hz = 50,
+        MAG_ODR_100Hz = 100,
+    };
+
 #define BIT_ACC_INT_CLICK BIT(7)
 #define BIT_ACC_INT_AOI1 BIT(6)
 #define BIT_ACC_INT_AOI2 BIT(5)

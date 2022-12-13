@@ -79,17 +79,33 @@ const lsm303agr_reg_t ctrl_reg_4 = {
 };
 
 const lsm303agr_reg_t cfg_reg_a = {
+#ifdef CONFIG_LSM303AGR_MAG_ODR_SINGLESHOT
     .cfg_reg_a_m.md = LSM303AGR_IDLE_DEFAULT,
+#else
+    .cfg_reg_a_m.md = LSM303AGR_CONTINUOUS_MODE,
+#endif
+#ifdef CONFIG_LSM303AGR_MAG_ODR_20HZ
+    .cfg_reg_a_m.odr = LSM303AGR_MG_ODR_20Hz,
+#endif
+#ifdef CONFIG_LSM303AGR_MAG_ODR_50HZ
+    .cfg_reg_a_m.odr = LSM303AGR_MG_ODR_50Hz,
+#endif
+#ifdef CONFIG_LSM303AGR_MAG_ODR_100HZ
+    .cfg_reg_a_m.odr = LSM303AGR_MG_ODR_100Hz,
+#endif
 #ifdef CONFIG_LSM303AGR_MAG_OP_MODE_LOW_POWER
     .cfg_reg_a_m.lp = 1,
 #endif
-    .cfg_reg_a_m.reboot = 1,
     .cfg_reg_a_m.comp_temp_en = 1,
 };
 
 const lsm303agr_reg_t cfg_reg_b = {
     .cfg_reg_b_m.set_rst = 1,
     .cfg_reg_b_m.off_canc_one_shot = 1,
+};
+
+const lsm303agr_reg_t cfg_reg_c = {
+    .cfg_reg_c_m.bdu = 1,
 };
 
 /* get lsm303agr accelerometer register from sensor_attr value */
@@ -243,6 +259,14 @@ const int16_t lsm303agr_acc_reg_to_scale[] = {
     18756, /* 1172.25  */
 };
 
+/* set accelerometer interrupt threshold register LSB value */
+const int16_t lsm303agr_acc_reg_to_thrs[] = {
+    16,
+    32,
+    62,
+    186,
+};
+
 /* convert accelerometer 12 bit raw reading to sensor value in 1/1000 g */
 void lsm303agr_acc_convert(int16_t raw_val, int16_t scale, int32_t *val)
 {
@@ -258,6 +282,164 @@ void lsm303agr_temp_convert(uint8_t *raw_temp, struct sensor_value *val)
     // least significiant byte appears to have additional two bits of fractional part
     // put this as decimal part with three digits in sensor_value.val2
     val->val2 = (raw_temp[0] >> 6) * 250;
+}
+
+int lsm303agr_acc_range_set(const struct device *dev, int32_t range)
+{
+    const struct lsm303agr_config *cfg = dev->config;
+    struct lsm303agr_data *data = dev->data;
+    lsm303agr_fs_a_t fs_bits;
+    int status;
+
+    switch (range) // range in g
+    {
+    case 2:
+        fs_bits = LSM303AGR_2g;
+        break;
+    case 4:
+        fs_bits = LSM303AGR_4g;
+        break;
+    case 8:
+        fs_bits = LSM303AGR_8g;
+        break;
+    case 16:
+        fs_bits = LSM303AGR_16g;
+        break;
+    default:
+        return -EINVAL;
+    }
+
+    status = lsm303agr_xl_full_scale_set(&cfg->i2c_acc, fs_bits);
+    if (status == 0)
+    {
+        data->acc_conv_scale = lsm303agr_acc_reg_to_scale[fs_bits];
+        data->acc_thrs_scale = lsm303agr_acc_reg_to_thrs[fs_bits];
+    }
+
+    return status;
+}
+
+int lsm303agr_acc_odr_set(const struct device *dev, int32_t freq)
+{
+    const struct lsm303agr_config *cfg = dev->config;
+    struct lsm303agr_data *data = dev->data;
+    lsm303agr_ctrl_reg1_a_t ctrl_reg;
+    lsm303agr_odr_a_t odr_bits;
+    int status;
+
+    switch (freq) // output data date in Hz
+    {
+    case 0:
+        odr_bits = LSM303AGR_XL_POWER_DOWN;
+        break;
+    case 1:
+        odr_bits = LSM303AGR_XL_ODR_1Hz;
+        break;
+    case 10:
+        odr_bits = LSM303AGR_XL_ODR_10Hz;
+        break;
+    case 25:
+        odr_bits = LSM303AGR_XL_ODR_25Hz;
+        break;
+    case 50:
+        odr_bits = LSM303AGR_XL_ODR_50Hz;
+        break;
+    case 100:
+        odr_bits = LSM303AGR_XL_ODR_100Hz;
+        break;
+    case 200:
+        odr_bits = LSM303AGR_XL_ODR_200Hz;
+        break;
+    case 400:
+        odr_bits = LSM303AGR_XL_ODR_400Hz;
+        break;
+    case 1620:
+        odr_bits = LSM303AGR_XL_ODR_1kHz620_LP;
+        break;
+    case 1344:
+    case 5376:
+        odr_bits = LSM303AGR_XL_ODR_1kHz344_NM_HP_5kHz376_LP;
+        break;
+    default:
+        return -EINVAL;
+    }
+
+    if (odr_bits == LSM303AGR_XL_ODR_1kHz620_LP || odr_bits == LSM303AGR_XL_ODR_1kHz344_NM_HP_5kHz376_LP)
+    {
+        status = lsm303agr_read_reg(&cfg->i2c_acc, LSM303AGR_CTRL_REG1_A, (uint8_t *)&ctrl_reg, 1);
+        if (status < 0)
+            return status;
+
+        if (freq == 1344 && ctrl_reg.lpen)
+        {
+            // clear low power mode to use 1.344 kHz data rate
+            ctrl_reg.lpen = 0;
+            status = lsm303agr_write_reg(&cfg->i2c_acc, LSM303AGR_CTRL_REG1_A, (uint8_t *)&ctrl_reg, 1);
+            if (status < 0)
+                return status;
+        }
+        if (freq > 1344 && !ctrl_reg.lpen)
+        {
+            // set low power mode to use 1.620 or 5.376 kHz data rate
+            status = lsm303agr_xl_operating_mode_set(&cfg->i2c_acc, LSM303AGR_LP_8bit);
+            if (status < 0)
+                return status;
+        }
+    }
+
+    status = lsm303agr_xl_data_rate_set(&cfg->i2c_acc, odr_bits);
+    if (status < 0)
+        return status;
+
+    if (status == 0)
+        data->status.acc_rate = odr_bits;
+
+    return status;
+}
+
+int lsm303agr_mag_odr_set(const struct device *dev, int32_t freq)
+{
+    const struct lsm303agr_config *cfg = dev->config;
+    struct lsm303agr_data *data = dev->data;
+    lsm303agr_mg_odr_m_t odr_bits;
+    lsm303agr_md_m_t op_bits = LSM303AGR_CONTINUOUS_MODE;
+    int status;
+
+    switch (freq) // output data date in Hz
+    {
+    case 0:
+        op_bits = LSM303AGR_IDLE_DEFAULT;
+    case 10:
+        odr_bits = LSM303AGR_MG_ODR_10Hz;
+        break;
+    case 20:
+        odr_bits = LSM303AGR_MG_ODR_20Hz;
+        break;
+    case 50:
+        odr_bits = LSM303AGR_MG_ODR_50Hz;
+        break;
+    case 100:
+        odr_bits = LSM303AGR_MG_ODR_100Hz;
+        break;
+    default:
+        return -EINVAL;
+    }
+
+    status = lsm303agr_mag_data_rate_set(&cfg->i2c_mag, odr_bits);
+    if (status < 0)
+        return status;
+
+    status = lsm303agr_mag_operating_mode_set(&cfg->i2c_mag, op_bits);
+    if (status < 0)
+        return status;
+
+    if (status == 0)
+    {
+        data->status.mag_single_shot = (bool)op_bits;
+        data->status.mag_rate = odr_bits;
+    }
+
+    return status;
 }
 
 int lsm303agr_attr_get(const struct device *dev,
@@ -337,21 +519,33 @@ int lsm303agr_attr_set(const struct device *dev,
     case SENSOR_CHAN_ACCEL_Y:
     case SENSOR_CHAN_ACCEL_Z:
     case SENSOR_CHAN_ACCEL_XYZ:
-        reg = lsm303agr_acc_reg_get(attr);
-        if (reg.addr == 0 || !reg.write)
-            return -ENOTSUP;
+        if (attr == SENSOR_ATTR_SAMPLING_FREQUENCY)
+            return lsm303agr_acc_odr_set(dev, val->val1);
+        else if (attr == SENSOR_ATTR_FULL_SCALE)
+            return lsm303agr_acc_range_set(dev, val->val1);
         else
-            return lsm303agr_write_reg(&cfg->i2c_acc, reg.addr, (uint8_t *)&val->val1, 1);
+        {
+            reg = lsm303agr_acc_reg_get(attr);
+            if (reg.addr == 0 || !reg.write)
+                return -ENOTSUP;
+            else
+                return lsm303agr_write_reg(&cfg->i2c_acc, reg.addr, (uint8_t *)&val->val1, 1);
+        }
 
     case SENSOR_CHAN_MAGN_X:
     case SENSOR_CHAN_MAGN_Y:
     case SENSOR_CHAN_MAGN_Z:
     case SENSOR_CHAN_MAGN_XYZ:
-        reg = lsm303agr_mag_reg_get(attr);
-        if (reg.addr == 0 || !reg.write)
-            return -ENOTSUP;
+        if (attr == SENSOR_ATTR_SAMPLING_FREQUENCY)
+            return lsm303agr_mag_odr_set(dev, val->val1);
         else
-            return lsm303agr_write_reg(&cfg->i2c_mag, reg.addr, (uint8_t *)&val->val1, 1);
+        {
+            reg = lsm303agr_mag_reg_get(attr);
+            if (reg.addr == 0 || !reg.write)
+                return -ENOTSUP;
+            else
+                return lsm303agr_write_reg(&cfg->i2c_mag, reg.addr, (uint8_t *)&val->val1, 1);
+        }
 
     default:
         return -ENOTSUP;
@@ -694,6 +888,8 @@ int lsm303agr_init(const struct device *dev)
         return status;
 #endif
     data->acc_conv_scale = lsm303agr_acc_reg_to_scale[ctrl_reg_4.ctrl_reg4_a.fs];
+    data->acc_thrs_scale = lsm303agr_acc_reg_to_thrs[ctrl_reg_4.ctrl_reg4_a.fs];
+    data->status.acc_rate = ctrl_reg_1.ctrl_reg1_a.odr;
 
     /** Magnetometer initialization **/
 
@@ -705,19 +901,16 @@ int lsm303agr_init(const struct device *dev)
     k_busy_wait(5);
 
     // Set default configuration
-    id = cfg_reg_a.byte;
-    status = lsm303agr_write_reg(&cfg->i2c_mag, LSM303AGR_CFG_REG_A_M, &id, 1);
-    if (status < 0)
-        return status;
+    raw[0] = cfg_reg_a.byte; // CFG_REG_A_M
+    raw[1] = cfg_reg_b.byte; // CFG_REG_B_M
+    raw[2] = cfg_reg_c.byte; // CFG_REG_C_M
 
-    k_busy_wait(20);
-
-    id = cfg_reg_b.byte;
-    status = lsm303agr_write_reg(&cfg->i2c_mag, LSM303AGR_CFG_REG_B_M, &id, 1);
+    status = lsm303agr_write_reg(&cfg->i2c_mag, LSM303AGR_CFG_REG_A_M | LSM303AGR_AUTOINCR_ADDR, raw, 3);
     if (status < 0)
         return status;
 
     data->status.mag_single_shot = (bool)cfg_reg_a.cfg_reg_a_m.md;
+    data->status.mag_rate = cfg_reg_a.cfg_reg_a_m.odr;
 
     if (cfg->gpio_acc_int1.port || cfg->gpio_acc_int2.port || cfg->gpio_mag_int0.port)
     {

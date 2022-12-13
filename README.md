@@ -1,4 +1,44 @@
 
+### 13 Dec 2022
+
+Add `sensor_attr_set` parameters to change full scale range and output data rate for accelerometer block and output data rate for magnetometer block.
+
+Attributes `SENSOR_ATTR_FULL_SCALE` and `SENSOR_ATTR_SAMPLING_FREQUENCY` can be used with channel `SENSOR_CHAN_ACCEL_XYZ`. Attribute `SENSOR_ATTR_SAMPLING_FREQUENCY` can be used with channel `SENSOR_CHAN_MAGN_XYZ`. Value to set is specified in `sensor_value` member `val1`.
+
+Following value presets are added to set `SENSOR_CHAN_ACCEL_XYZ` attribute `SENSOR_ATTR_FULL_SCALE`: \
+`ACC_RANGE_2G` \
+`ACC_RANGE_4G` \
+`ACC_RANGE_8G` \
+`ACC_RANGE_16G`
+
+Following value presets are added to set `SENSOR_CHAN_ACCEL_XYZ` attribute `SENSOR_ATTR_SAMPLING_FREQUENCY`: \
+`ACC_ODR_POWERDOWN` \
+`ACC_ODR_1Hz` \
+`ACC_ODR_10Hz` \
+`ACC_ODR_25Hz` \
+`ACC_ODR_50Hz` \
+`ACC_ODR_100Hz` \
+`ACC_ODR_200Hz` \
+`ACC_ODR_400Hz` \
+`ACC_ODR_1344Hz` (setting this data rate will clear low power mode if it is currently active) \
+`ACC_ODR_1620Hz_LP` (setting this data rate will set low power mode if it is currently not active) \
+`ACC_ODR_5376Hz_LP` (setting this data rate will set low power mode if it is currently not active)
+
+Following value presets are added to set `SENSOR_CHAN_MAGN_XYZ` attribute `SENSOR_ATTR_FULL_SCALE`: \
+`MAG_ODR_SINGLESHOT` \
+`MAG_ODR_10Hz` \
+`MAG_ODR_20Hz` \
+`MAG_ODR_50Hz` \
+`MAG_ODR_100Hz`
+
+**Kconfig options added to set initial output data rate of magnetometer:**
+
+`CONFIG_LSM303AGR_MAG_ODR_SINGLESHOT` (default value if not set - measurement is read at each `sensor_sample_fetch` call) \
+`CONFIG_LSM303AGR_MAG_ODR_10HZ` \
+`CONFIG_LSM303AGR_MAG_ODR_20HZ` \
+`CONFIG_LSM303AGR_MAG_ODR_50HZ` \
+`CONFIG_LSM303AGR_MAG_ODR_100HZ`
+
 ### 10 Dec 2022
 
 Add `sensor_trigger_set` to enable accelerometer INT1 and INT2 interrupts. INT1 and INT2 interrupt gpio pins are configured according to device tree property `irq-acc-gpios`. Just one (INT1) or both (INT1 and INT2) gpios can be defined. Gpio pins should be set as `GPIO_ACTIVE_HIGH` or `(GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)`.

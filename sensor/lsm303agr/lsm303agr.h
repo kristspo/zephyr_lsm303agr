@@ -33,10 +33,12 @@ typedef union lsm303agr_sample_type
 
 typedef struct lsm303agr_status_type
 {
+    uint8_t acc_rate : 4;
     uint8_t acc_int1 : 1;
     uint8_t acc_int2 : 1;
     uint8_t mag_int0 : 1;
     uint8_t mag_single_shot : 1;
+    uint8_t mag_rate : 2;
 } lsm303agr_status;
 
 typedef struct lsm303agr_trig_type
@@ -50,6 +52,7 @@ struct lsm303agr_data
     lsm303agr_sample acc_sample;
     lsm303agr_sample mag_sample;
     int16_t acc_conv_scale;
+    int16_t acc_thrs_scale;
     uint8_t raw_temp[2];
 
     lsm303agr_status status;

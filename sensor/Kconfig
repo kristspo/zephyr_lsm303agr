@@ -110,4 +110,29 @@ config LSM303AGR_MAG_OP_MODE_LOW_POWER
 
 endchoice
 
+choice LSM303AGR_MAG_ODR
+	prompt "Magnetometer data rate frequency"
+	default LSM303AGR_MAG_ODR_SINGLESHOT
+	help
+		Initial magnetometer data rate frequency.
+
+config LSM303AGR_MAG_ODR_SINGLESHOT
+	bool "Single measurement mode"
+	help
+		Measurements read as requested by sensor_sample_fetch.
+
+config LSM303AGR_MAG_ODR_10HZ
+	bool "10Hz"
+
+config LSM303AGR_MAG_ODR_20HZ
+	bool "20Hz"
+
+config LSM303AGR_MAG_ODR_50HZ
+	bool "50Hz"
+
+config LSM303AGR_MAG_ODR_100HZ
+	bool "100Hz"
+
+endchoice
+
 endif # LSM303AGR
