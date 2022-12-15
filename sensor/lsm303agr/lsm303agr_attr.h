@@ -150,6 +150,21 @@ extern "C"
 #define BIT_ACC_CFG_X_D_CLICK BIT(1)
 #define BIT_ACC_CFG_X_S_CLICK BIT(0)
 
+    // magnetometer interrupt configuration options
+    enum lsm303agr_mag_int
+    {
+        MAG_INT_OFF,
+        MAG_INT_THRS_DEFAULT,
+        MAG_INT_THRS_LESS,
+        MAG_INT_THRS_BOTH,
+        MAG_INT_BIT_THRS_OFFSET = 0x80,
+    };
+
+// magnetometer INT_CTRL_REG configuration bits
+#define BIT_MAG_CFG_XIEN BIT(7)
+#define BIT_MAG_CFG_YIEN BIT(6)
+#define BIT_MAG_CFG_ZIEN BIT(5)
+
 #ifdef __cplusplus
 }
 #endif

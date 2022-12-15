@@ -811,6 +811,90 @@ int lsm303agr_trigger_set(const struct device *dev,
             return -ENOTSUP;
         }
 
+    case SENSOR_CHAN_MAGN_X:
+    case SENSOR_CHAN_MAGN_Y:
+    case SENSOR_CHAN_MAGN_Z:
+    case SENSOR_CHAN_MAGN_XYZ:
+
+        if (trig_type == TRIG_MAG_INT)
+        {
+            if (cfg->gpio_mag_int0.port)
+            {
+                lsm303agr_int_crtl_reg_m_t ctrl_reg;
+                gpio_flags_t int_flags = GPIO_INT_DISABLE;
+
+                // read INT_CTRL_REG_M
+                status = lsm303agr_mag_int_gen_conf_get(&cfg->i2c_mag, &ctrl_reg);
+                if (status < 0)
+                    return status;
+
+                ctrl_reg.ien = 1;
+                ctrl_reg.iel = 0;
+                ctrl_reg.iea = 1;
+
+                switch (trig_bits & (MAG_INT_BIT_THRS_OFFSET - 1))
+                {
+                case MAG_INT_OFF:
+                    ctrl_reg.ien = 0;
+                    // clear gpio pin interrupt
+                    status = lsm303agr_gpio_int_set(&cfg->gpio_mag_int0, GPIO_INT_DISABLE);
+                    if (status < 0)
+                        return status;
+                    break;
+                case MAG_INT_THRS_DEFAULT:
+                    int_flags = GPIO_INT_EDGE_TO_ACTIVE;
+                    break;
+                case MAG_INT_THRS_LESS:
+                    int_flags = GPIO_INT_EDGE_TO_INACTIVE;
+                    break;
+                case MAG_INT_THRS_BOTH:
+                    int_flags = GPIO_INT_EDGE_BOTH;
+                    break;
+                default:
+                    return -ENOTSUP;
+                }
+
+                if (ctrl_reg.ien)
+                {
+                    // update CGF_REG_B_M INT_ON_DATAOFF bit
+                    status = lsm303agr_mag_offset_int_conf_set(&cfg->i2c_mag, (trig_bits & MAG_INT_BIT_THRS_OFFSET) ? 1 : 0);
+                    if (status < 0)
+                        return status;
+                }
+
+                // update INT_CTRL_REG_M IEA, IEL, IEN bits
+                status = lsm303agr_mag_int_gen_conf_set(&cfg->i2c_mag, &ctrl_reg);
+                if (status < 0)
+                    return status;
+
+                // update CGF_REG_C_M INT_MAG_PIN bit
+                status = lsm303agr_mag_int_on_pin_set(&cfg->i2c_mag, ctrl_reg.ien);
+                if (status < 0)
+                    return status;
+
+                data->mag_int0.enable = trig_bits;
+                data->mag_int0.handler = handler;
+
+                if (ctrl_reg.ien)
+                {
+                    k_msleep(10);
+                    // set gpio pin interrupt
+                    status = lsm303agr_gpio_int_set(&cfg->gpio_mag_int0, int_flags);
+                    if (status < 0)
+                        return status;
+                }
+
+                return 0;
+            }
+            else
+            {
+                LOG_ERR("INT_MAG pin not defined in device tree");
+                return -ENODEV;
+            }
+        }
+        else
+            return -ENOTSUP;
+
     default:
         return -ENOTSUP;
     }

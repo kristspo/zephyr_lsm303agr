@@ -1,4 +1,42 @@
 
+### 15 Dec 2022
+
+Add `sensor_trigger_set` to enable magnetometer MAG_INT interrupt. Interrupt gpio pin is configured according to device tree property `irq-mag-gpios`. Gpio pin should be set as `GPIO_ACTIVE_HIGH` or `(GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)`.
+
+To use interrupt `INT_CTRL_REG_M` bits `XIEN`, `YIEN`, `ZIEN` should be configured. Interrupt threshold value should be written to `INT_THS_L_REG_M`, `INT_THS_H_REG_M` and possibly `OFFSET_x` registers configured.
+
+Following bit defines are added that can be used to set `INT_CTRL_REG_M` register: \
+`BIT_MAG_CFG_XIEN` \
+`BIT_MAG_CFG_YIEN` \
+`BIT_MAG_CFG_ZIEN`
+
+Driver will set remaining bits of `INT_CTRL_REG_M` as required for interrupt operation.
+
+Interrupt is configured according to `sensor_trigger` parameter passed to `sensor_trigger_set` call. Member `chan` should be set to `SENSOR_CHAN_MAGN_XYZ` (also `SENSOR_CHAN_MAGN_X`, `SENSOR_CHAN_MAGN_Y`, `SENSOR_CHAN_MAGN_Z` can be used with same result). Member `type` encodes interrupt configuration where `enum lsm303agr_trigger` value `TRIG_MAG_INT` is combined with interrupt configuration set in highest 8 bits.
+
+To set additional magnetometer interrupt configuration `enum lsm303agr_mag_int` values are defined: \
+`MAG_INT_OFF` \
+`MAG_INT_THRS_DEFAULT` \
+`MAG_INT_THRS_LESS` \
+`MAG_INT_THRS_BOTH` \
+`MAG_INT_BIT_THRS_OFFSET`
+
+Magnetometer interrupt threshold is unsigned value same for all axis. Magnetometer sets interrupt source register as axis value passes threshold both for positive and negative side. However, by detecting different edges of MAG_INT line it is possible to use several configurations.
+
+`MAG_INT_THRS_DEFAULT` will generate interrupt when axis value exceeds threshold positive or negative value. Interrupt source register will have corresponding bits set.
+
+`MAG_INT_THRS_LESS` will generate interrupt when axis value becomes less towards zero than threshold positive or negative value. Interrupt source register values will not have any bits set as magnetometer does not recognise this as interrupt condition.
+
+`MAG_INT_THRS_BOTH` will generate interrupt when axis value becomes greater or less than threshold value. Interrupt source register will have corresponding bits set only if axis value did pass threshold value to positive or negative side.
+
+Interrupt source bits from `INT_SOURCE_REG_M` are passed to trigger handler function in highest bits of `sensor_trigger` member `type`.
+
+Additionally `MAG_INT_BIT_THRS_OFFSET` can be combined with mentioned values to configure if interrupt threshold detection uses hard-iron offset correction to discover interrupt.
+
+Value of interrupt configuration can be put in correct location in `sensor_trigger` member `type` using macro `TRIGGER_BITS_SET()`. As for example: `TRIG_MAG_INT | TRIGGER_BITS_SET(MAG_INT_THRS_DEFAULT | MAG_INT_BIT_THRS_OFFSET)` would enable magnetometer interrupt configuration with hard-iron offset correction.
+
+In trigger handler function macro `TRIGGER_SRC_GET()` can be used to get interrupt source register value from `sensor_trigger` member `type`. This applies both to accelerometer (`TRIG_ACC_INT1`, `TRIG_ACC_INT1`) and magnetometer (`TRIG_MAG_INT`) interrupts.
+
 ### 13 Dec 2022
 
 Add `sensor_attr_set` parameters to change full scale range and output data rate for accelerometer block and output data rate for magnetometer block.
@@ -65,7 +103,7 @@ Following bit defines are added that can be used to set `CLICK_CFG_A` register: 
 
 Interrupt is configured to INT1 or INT2 pin according to `sensor_trigger` parameter passed to `sensor_trigger_set` call. Member `chan` should be set to `SENSOR_CHAN_ACCEL_XYZ` (also `SENSOR_CHAN_ACCEL_X`, `SENSOR_CHAN_ACCEL_Y`, `SENSOR_CHAN_ACCEL_Z` can be used with same result).
 
-Member `type` encodes interrupt configuration where lowest 8 bits of 16 bit value defines INT pin. Driver expects `enum lsm303agr_trigger` values `TRIG_ACC_INT1`, `TRIG_ACC_INT2`, `TRIG_MAG_INT`. Highest 8 bits defines interrupt type that will be configured for interrupt pin.
+Member `type` encodes interrupt configuration where lowest 8 bits of 16 bit value defines INT pin. Driver expects `enum lsm303agr_trigger` value `TRIG_ACC_INT1` or `TRIG_ACC_INT2` to be used with accelerometer interrupts. Highest 8 bits defines interrupt type that will be configured for interrupt pin.
 
 Following bit defines are added to set interrupt enable bits: \
 `BIT_ACC_INT_CLICK` \

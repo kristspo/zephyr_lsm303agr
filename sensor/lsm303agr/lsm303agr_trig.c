@@ -50,16 +50,24 @@ void lsm303agr_acc_interrupt(const lsm303agr_trig *trigger,
 }
 
 void lsm303agr_mag_interrupt(const lsm303agr_trig *trigger,
-                             const enum lsm303agr_int interrupt,
                              const struct device *dev)
 {
+    const struct lsm303agr_config *cfg = dev->config;
     struct sensor_trigger resp;
     resp.chan = SENSOR_CHAN_MAGN_XYZ;
     resp.type = trigger->enable;
-    if (trigger->handler)
+
+    // read interrupt source register
+    uint8_t src_bits;
+    int status = lsm303agr_read_reg(&cfg->i2c_mag, LSM303AGR_INT_SOURCE_REG_M, &src_bits, 1);
+    if (status == 0)
     {
-        trigger->handler(dev, &resp);
+        PRINT(" interrupt src register 0x%02x : 0x%02x \n", LSM303AGR_INT_SOURCE_REG_M, src_bits);
+        resp.type |= TRIGGER_BITS_SET(src_bits);
     }
+
+    if (trigger->handler)
+        trigger->handler(dev, &resp);
 }
 
 void lsm303agr_acc_int1_callback(const struct device *port,
@@ -124,6 +132,7 @@ void lsm303agr_work_cb(struct k_work *work)
     if (data->status.mag_int0)
     {
         data->status.mag_int0 = 0;
+        lsm303agr_mag_interrupt(&data->mag_int0, data->dev);
     }
 }
 
