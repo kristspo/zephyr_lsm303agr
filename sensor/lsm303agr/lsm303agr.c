@@ -794,6 +794,7 @@ int lsm303agr_trigger_set(const struct device *dev,
                 {
                     if ((trig_bits == 0x00) && (data->acc_int1.enable & (BIT_ACC_INT_FIFO_WTM | BIT_ACC_INT_FIFO_OVR)))
                     {
+                        data->status.fifo_ready = false;
                         // disable FIFO
                         status = lsm303agr_xl_fifo_set(&cfg->i2c_acc, 0);
                         if (status < 0)
@@ -804,6 +805,7 @@ int lsm303agr_trigger_set(const struct device *dev,
                     }
                     else if (trig_bits & (BIT_ACC_INT_FIFO_WTM | BIT_ACC_INT_FIFO_OVR))
                     {
+                        data->status.fifo_ready = false;
                         // verify FIFO configuration
                         lsm303agr_fm_a_t fifo_mode;
                         status = lsm303agr_xl_fifo_mode_get(&cfg->i2c_acc, &fifo_mode);
