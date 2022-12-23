@@ -558,6 +558,7 @@ int lsm303agr_channel_get(const struct device *dev,
                           enum sensor_channel chan,
                           struct sensor_value *val)
 {
+    const struct lsm303agr_config *cfg = dev->config;
     struct lsm303agr_data *data = dev->data;
     int read_start_a, read_end_a;
     int read_start_m, read_end_m;
@@ -569,6 +570,41 @@ int lsm303agr_channel_get(const struct device *dev,
     case SENSOR_CHAN_DIE_TEMP:
         lsm303agr_temp_convert(data->raw_temp, val);
         return 0;
+
+    case SENSOR_CHAN_ACCEL_XYZ_FIFO:
+        if (data->status.fifo_ready && data->fifo_size)
+        {
+#ifdef CONFIG_LSM303AGR_FIFO_BURST_READ
+            uint16_t read_count = data->fifo_size * 3; // samples count
+            // refer to FIFO multiple read (burst) in datasheet
+            int status = lsm303agr_read_reg(&cfg->i2c_acc, LSM303AGR_OUT_X_L_A | LSM303AGR_AUTOINCR_ADDR, data->fifo_buffer.raw_xyz, read_count * 2);
+            if (status < 0)
+                return status;
+            for (uint16_t z = 0; z < read_count; z++, val++)
+            {
+                val->val2 = 0;
+                lsm303agr_acc_convert(data->fifo_buffer.xyz[z] >> 4, data->acc_conv_scale, &val->val1);
+            }
+#else
+            uint16_t read_count = data->fifo_size; // xyz samples count
+            while (read_count--)
+            {
+                int16_t xyz[3];
+                int status = lsm303agr_read_reg(&cfg->i2c_acc, LSM303AGR_OUT_X_L_A | LSM303AGR_AUTOINCR_ADDR, (uint8_t *)xyz, sizeof(xyz));
+                if (status < 0)
+                    return status;
+                for (uint16_t y = 0; y < 3; y++, val++)
+                {
+                    val->val2 = 0;
+                    lsm303agr_acc_convert(xyz[y] >> 4, data->acc_conv_scale, &val->val1);
+                }
+            }
+#endif
+            data->status.fifo_ready = false;
+            return 0;
+        }
+        else
+            return -ENODATA;
 
     case SENSOR_CHAN_ACCEL_X:
         read_acc = true;
@@ -756,6 +792,31 @@ int lsm303agr_trigger_set(const struct device *dev,
             {
                 if ((trig_bits == 0x00) || (trig_bits & ALLOW_BITS_ACC_INT1))
                 {
+                    if ((trig_bits == 0x00) && (data->acc_int1.enable & (BIT_ACC_INT_FIFO_WTM | BIT_ACC_INT_FIFO_OVR)))
+                    {
+                        // disable FIFO
+                        status = lsm303agr_xl_fifo_set(&cfg->i2c_acc, 0);
+                        if (status < 0)
+                            return status;
+                        status = lsm303agr_xl_fifo_mode_set(&cfg->i2c_acc, LSM303AGR_BYPASS_MODE);
+                        if (status < 0)
+                            return status;
+                    }
+                    else if (trig_bits & (BIT_ACC_INT_FIFO_WTM | BIT_ACC_INT_FIFO_OVR))
+                    {
+                        // verify FIFO configuration
+                        lsm303agr_fm_a_t fifo_mode;
+                        status = lsm303agr_xl_fifo_mode_get(&cfg->i2c_acc, &fifo_mode);
+                        if (status < 0)
+                            return status;
+                        if (fifo_mode == LSM303AGR_BYPASS_MODE)
+                            return -ENODATA;
+                        // enable FIFO
+                        status = lsm303agr_xl_fifo_set(&cfg->i2c_acc, 1);
+                        if (status < 0)
+                            return status;
+                    }
+
                     // set INT1 configuration register
                     status = lsm303agr_write_reg(&cfg->i2c_acc, LSM303AGR_CTRL_REG3_A, &trig_bits, 1);
                     if (status < 0)
@@ -958,6 +1019,10 @@ int lsm303agr_init(const struct device *dev)
     raw[4] = ctrl_reg_4.byte;    // CTRL_REG4_A
 
     status = lsm303agr_write_reg(&cfg->i2c_acc, LSM303AGR_TEMP_CFG_REG_A | LSM303AGR_AUTOINCR_ADDR, raw, sizeof(raw));
+    if (status < 0)
+        return status;
+
+    status = lsm303agr_write_reg(&cfg->i2c_acc, LSM303AGR_FIFO_CTRL_REG_A, &raw[6], 1);
     if (status < 0)
         return status;
 

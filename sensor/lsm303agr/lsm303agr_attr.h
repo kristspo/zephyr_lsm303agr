@@ -79,6 +79,11 @@ extern "C"
         MAG_ATTR_END,
     };
 
+    enum lsm303agr_channel
+    {
+        SENSOR_CHAN_ACCEL_XYZ_FIFO = SENSOR_CHAN_PRIV_START,
+    };
+
     // LSM303AGR specific trigger types
     enum lsm303agr_trigger
     {
@@ -150,7 +155,14 @@ extern "C"
 #define BIT_ACC_CFG_X_D_CLICK BIT(1)
 #define BIT_ACC_CFG_X_S_CLICK BIT(0)
 
-    // magnetometer interrupt configuration options
+// accelerometer FIFO mode configuration
+#define ACC_FIFO_OFF 0x00
+#define ACC_FIFO_FIFO 0x40
+#define ACC_FIFO_STREAM 0x80
+#define ACC_FIFO_ON_INT1 0xC0
+#define ACC_FIFO_ON_INT2 0xE0
+
+    // magnetometer interrupt configuration
     enum lsm303agr_mag_int
     {
         MAG_INT_OFF,

@@ -11,6 +11,7 @@ void lsm303agr_acc_interrupt(const lsm303agr_trig *trigger,
                              const struct device *dev)
 {
     const struct lsm303agr_config *cfg = dev->config;
+    struct lsm303agr_data *data = dev->data;
     struct sensor_trigger resp;
     resp.chan = SENSOR_CHAN_ACCEL_XYZ;
     resp.type = trigger->enable;
@@ -42,6 +43,11 @@ void lsm303agr_acc_interrupt(const lsm303agr_trig *trigger,
         {
             PRINT(" interrupt src register 0x%02x : 0x%02x \n", src_reg, src_bits);
             resp.type |= TRIGGER_BITS_SET(src_bits);
+            if (src_reg == LSM303AGR_FIFO_SRC_REG_A)
+            {
+                data->fifo_size = (src_bits & 0x1F);
+                data->status.fifo_ready = true;
+            }
         }
     }
 

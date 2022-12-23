@@ -91,6 +91,9 @@ config LSM303AGR_ACC_ODR_9
 
 endchoice
 
+config LSM303AGR_FIFO_BURST_READ
+	bool "Use FIFO burst read with additional 192 byte RAM buffer"
+
 config LSM303AGR_MEASURE_TEMPERATURE
 	bool "Enable internal temperature measurements"
 

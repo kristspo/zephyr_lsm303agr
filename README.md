@@ -1,4 +1,24 @@
 
+### 23 Dec 2022
+
+Add `sensor_channel_get` and configuration options for FIFO triggers. Before enabling FIFO trigger FIFO mode and (if required) watermark level should be written to `FIFO_CTRL_REG_A`. FIFO trigger can be enabled for INT1 with trigger type `TRIG_ACC_INT1` and enable bits `BIT_ACC_INT_FIFO_WTM`, `BIT_ACC_INT_FIFO_OVR`.
+
+Following defines are added than can be used to set up `FIFO_CTRL_REG_A` register: \
+`ACC_FIFO_OFF` \
+`ACC_FIFO_FIFO` \
+`ACC_FIFO_STREAM` \
+`ACC_FIFO_ON_INT1` (this configures Stream to FIFO mode) \
+`ACC_FIFO_ON_INT2` (this configures Stream to FIFO mode)
+
+FIFO operating mode bits can be combined with FIFO watermark level (from 0 to 31).
+
+In trigger callback function trigger source bits can be examined for sample count that can be read from FIFO. Lowest five bits contains number of unread samples stored in FIFO. Macro `TRIGGER_SRC_GET()` can be used to get interrupt source register value from `sensor_trigger` member `type` that is passed to trigger callback function. Calling `sensor_channel_get` with channel `SENSOR_CHAN_ACCEL_XYZ_FIFO` will write as many samples as in interrupt source register to array pointed by `struct sensor_value *` parameter. Three values (x, y, z) will be written for each sample. Maximum possible sample count in any case is 32 * 3.
+
+**Kconfig option is added to enable burst read option to read FIFO buffer:**
+
+`CONFIG_LSM303AGR_FIFO_BURST_READ` \
+This allows to read all FIFO samples in single I2C request by using additional 192 bytes RAM buffer.
+
 ### 15 Dec 2022
 
 Add `sensor_trigger_set` to enable magnetometer MAG_INT interrupt. Interrupt gpio pin is configured according to device tree property `irq-mag-gpios`. Gpio pin should be set as `GPIO_ACTIVE_HIGH` or `(GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)`.
