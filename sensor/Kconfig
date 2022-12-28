@@ -13,6 +13,15 @@ if LSM303AGR
 config LSM303AGR_RESET_I2C
 	bool "Recover I2C bus at start of driver initialization"
 
+config LSM303AGR_INTERRUPT_POLLING
+	bool "Enable interrupts polling"
+
+config LSM303AGR_INTERRUPT_POLL_INTERVAL
+	prompt "Interrupt polling interval in ms"
+	int
+	default 50
+	depends on LSM303AGR_INTERRUPT_POLLING
+
 # Accelerometer configuration settings
 
 choice LSM303AGR_ACC_OP_MODE

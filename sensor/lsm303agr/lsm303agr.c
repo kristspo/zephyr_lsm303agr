@@ -768,6 +768,36 @@ int lsm303agr_sample_fetch(const struct device *dev,
     }
 }
 
+int lsm303agr_fifo_set(const struct i2c_dt_spec *ctx, bool enable)
+{
+    int status;
+    if (enable)
+    {
+        // verify FIFO configuration
+        lsm303agr_fm_a_t fifo_mode;
+        status = lsm303agr_xl_fifo_mode_get(ctx, &fifo_mode);
+        if (status < 0)
+            return status;
+        if (fifo_mode == LSM303AGR_BYPASS_MODE)
+            return -ENODATA;
+        // enable FIFO
+        status = lsm303agr_xl_fifo_set(ctx, 1);
+        if (status < 0)
+            return status;
+    }
+    else
+    {
+        // disable FIFO
+        status = lsm303agr_xl_fifo_set(ctx, 0);
+        if (status < 0)
+            return status;
+        status = lsm303agr_xl_fifo_mode_set(ctx, LSM303AGR_BYPASS_MODE);
+        if (status < 0)
+            return status;
+    }
+    return 0;
+}
+
 int lsm303agr_trigger_set(const struct device *dev,
                           const struct sensor_trigger *trig,
                           sensor_trigger_handler_t handler)
@@ -777,7 +807,7 @@ int lsm303agr_trigger_set(const struct device *dev,
     int status;
 
     uint16_t trig_type = (trig->type & 0x00FF);
-    uint8_t trig_bits = (trig->type >> 8);
+    uint8_t trig_bits = (trig->type >> 8) & ALLOW_BITS_ALL;
 
     switch (trig->chan)
     {
@@ -795,26 +825,14 @@ int lsm303agr_trigger_set(const struct device *dev,
                     if ((trig_bits == 0x00) && (data->acc_int1.enable & (BIT_ACC_INT_FIFO_WTM | BIT_ACC_INT_FIFO_OVR)))
                     {
                         data->status.fifo_ready = false;
-                        // disable FIFO
-                        status = lsm303agr_xl_fifo_set(&cfg->i2c_acc, 0);
-                        if (status < 0)
-                            return status;
-                        status = lsm303agr_xl_fifo_mode_set(&cfg->i2c_acc, LSM303AGR_BYPASS_MODE);
+                        status = lsm303agr_fifo_set(&cfg->i2c_acc, false);
                         if (status < 0)
                             return status;
                     }
                     else if (trig_bits & (BIT_ACC_INT_FIFO_WTM | BIT_ACC_INT_FIFO_OVR))
                     {
                         data->status.fifo_ready = false;
-                        // verify FIFO configuration
-                        lsm303agr_fm_a_t fifo_mode;
-                        status = lsm303agr_xl_fifo_mode_get(&cfg->i2c_acc, &fifo_mode);
-                        if (status < 0)
-                            return status;
-                        if (fifo_mode == LSM303AGR_BYPASS_MODE)
-                            return -ENODATA;
-                        // enable FIFO
-                        status = lsm303agr_xl_fifo_set(&cfg->i2c_acc, 1);
+                        status = lsm303agr_fifo_set(&cfg->i2c_acc, true);
                         if (status < 0)
                             return status;
                     }
@@ -870,6 +888,12 @@ int lsm303agr_trigger_set(const struct device *dev,
                 return -ENODEV;
             }
 
+        case TRIG_POLLING:
+#ifdef CONFIG_LSM303AGR_INTERRUPT_POLLING
+            return lsm303agr_polling_init(dev, trig_bits, handler);
+#else
+            LOG_ERR("Interrupt polling not enabled");
+#endif
         default:
             return -ENOTSUP;
         }
@@ -878,9 +902,9 @@ int lsm303agr_trigger_set(const struct device *dev,
     case SENSOR_CHAN_MAGN_Y:
     case SENSOR_CHAN_MAGN_Z:
     case SENSOR_CHAN_MAGN_XYZ:
-
-        if (trig_type == TRIG_MAG_INT)
+        switch (trig_type)
         {
+        case TRIG_MAG_INT:
             if (cfg->gpio_mag_int0.port)
             {
                 lsm303agr_int_crtl_reg_m_t ctrl_reg;
@@ -954,9 +978,16 @@ int lsm303agr_trigger_set(const struct device *dev,
                 LOG_ERR("INT_MAG pin not defined in device tree");
                 return -ENODEV;
             }
-        }
-        else
+
+        case TRIG_POLLING:
+#ifdef CONFIG_LSM303AGR_INTERRUPT_POLLING
+            return lsm303agr_polling_init(dev, trig_bits, handler);
+#else
+            LOG_ERR("Interrupt polling not enabled");
+#endif
+        default:
             return -ENOTSUP;
+        }
 
     default:
         return -ENOTSUP;

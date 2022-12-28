@@ -46,10 +46,14 @@ typedef struct lsm303agr_status_type
     uint8_t mag_single_shot : 1;
     uint8_t mag_rate : 2;
     bool fifo_ready : 1;
+    bool timer_started : 1;
 } lsm303agr_status;
 
 typedef struct lsm303agr_trig_type
 {
+#ifdef CONFIG_LSM303AGR_INTERRUPT_POLLING
+    uint8_t active; // bits of fired polling interrupts
+#endif
     uint8_t enable; // bit(s) of enabled interrupts
     sensor_trigger_handler_t handler;
 } lsm303agr_trig;
@@ -75,6 +79,11 @@ struct lsm303agr_data
     lsm303agr_trig mag_int0;
     const struct device *dev;
     struct k_work work;
+#ifdef CONFIG_LSM303AGR_INTERRUPT_POLLING
+    lsm303agr_trig poll_int;
+    struct k_timer poll_timer;
+    struct k_work poll_work;
+#endif
 };
 
 typedef struct lsm303agr_reg_type
@@ -89,8 +98,8 @@ enum lsm303agr_int
     INT_AOI_1,
     INT_AOI_2,
     INT_ACT,
-    INT_FIFO_WTM,
-    INT_FIFO_OVR,
+    INT_MAG,
+    INT_FIFO,
 };
 
 int lsm303agr_attr_get(const struct device *dev,
@@ -114,9 +123,17 @@ int lsm303agr_trigger_set(const struct device *dev,
                           const struct sensor_trigger *trig,
                           sensor_trigger_handler_t handler);
 
+/* functions used between source files */
+
+int lsm303agr_fifo_set(const struct i2c_dt_spec *ctx,
+                       bool enable);
+
 int lsm303agr_init_gpios(const struct device *dev);
 
 int lsm303agr_gpio_int_set(const struct gpio_dt_spec *gpio,
                            gpio_flags_t flags);
+
+int lsm303agr_polling_init(const struct device *dev,
+                           uint8_t enable, sensor_trigger_handler_t handler);
 
 #endif

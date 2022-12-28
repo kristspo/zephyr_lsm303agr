@@ -90,6 +90,7 @@ extern "C"
         TRIG_ACC_INT1 = SENSOR_TRIG_PRIV_START,
         TRIG_ACC_INT2,
         TRIG_MAG_INT,
+        TRIG_POLLING,
     };
 
     // LSM303AGR full scale and data rate values
@@ -132,6 +133,15 @@ extern "C"
 
 #define ALLOW_BITS_ACC_INT1 (BIT_ACC_INT_CLICK | BIT_ACC_INT_AOI1 | BIT_ACC_INT_AOI2 | BIT_ACC_INT_FIFO_WTM | BIT_ACC_INT_FIFO_OVR)
 #define ALLOW_BITS_ACC_INT2 (BIT_ACC_INT_CLICK | BIT_ACC_INT_AOI1 | BIT_ACC_INT_AOI2 | BIT_ACC_INT_ACT)
+#define ALLOW_BITS_ALL ~(BIT(0))
+
+#define BIT_POLL_INT_CLICK BIT(7)
+#define BIT_POLL_INT_AOI1 BIT(6)
+#define BIT_POLL_INT_AOI2 BIT(5)
+#define BIT_POLL_INT_FIFO_WTM BIT(4)
+#define BIT_POLL_INT_FIFO_OVR BIT(3)
+#define BIT_POLL_INT_MAG BIT(2)
+#define BIT_POLL_MAG_THRS_OFFSET BIT(1)
 
 #define TRIGGER_BITS_SET(x) (x << 8)
 #define TRIGGER_BITS_GET(x) (x & 0x00FF)
@@ -166,9 +176,9 @@ extern "C"
     enum lsm303agr_mag_int
     {
         MAG_INT_OFF,
-        MAG_INT_THRS_DEFAULT,
-        MAG_INT_THRS_LESS,
-        MAG_INT_THRS_BOTH,
+        MAG_INT_THRS_DEFAULT = 2,
+        MAG_INT_THRS_LESS = 4,
+        MAG_INT_THRS_BOTH = 6,
         MAG_INT_BIT_THRS_OFFSET = 0x80,
     };
 

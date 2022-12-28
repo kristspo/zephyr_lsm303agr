@@ -1,4 +1,24 @@
 
+### 28 Dec 2022
+
+Add `sensor_trigger_set` to use polling trigger without using hardware gpio line. Polling trigger is enabled using trigger type `TRIG_POLLING` and enable bits that define interrupt source. Multiple source bits can be set. Channel `SENSOR_CHAN_ACCEL_XYZ` or `SENSOR_CHAN_MAGN_XYZ` can be used to enable polling trigger with same effect.
+
+Following bit defines are added to set polling trigger type: \
+`BIT_POLL_INT_CLICK` \
+`BIT_POLL_INT_AOI1` \
+`BIT_POLL_INT_AOI2` \
+`BIT_POLL_INT_FIFO_WTM` \
+`BIT_POLL_INT_FIFO_OVR` \
+`BIT_POLL_INT_MAG`
+
+Additionally `BIT_POLL_INT_MAG` can be combined with `BIT_POLL_MAG_THRS_OFFSET` to configure if interrupt threshold detection uses hard-iron offset correction value.
+
+Interrupt enable bits can be put in correct location in `sensor_trigger` member `type` using macro `TRIGGER_BITS_SET()`. As for example: `TRIG_POLLING | TRIGGER_BITS_SET(BIT_POLL_INT_AOI1 | BIT_POLL_INT_MAG)`.
+
+**Kconfig options added to configure polling trigger support:** \
+`CONFIG_LSM303AGR_INTERRUPT_POLLING` (must be enabled to use polling interrupts) \
+`CONFIG_LSM303AGR_INTERRUPT_POLL_INTERVAL` (sets interrupt polling interval in ms, default 50 ms if not configured)
+
 ### 23 Dec 2022
 
 Add `sensor_channel_get` and configuration options for FIFO triggers. Before enabling FIFO trigger FIFO mode and (if required) watermark level should be written to `FIFO_CTRL_REG_A`. FIFO trigger can be enabled for INT1 with trigger type `TRIG_ACC_INT1` and enable bits `BIT_ACC_INT_FIFO_WTM`, `BIT_ACC_INT_FIFO_OVR`.
@@ -53,7 +73,7 @@ Interrupt source bits from `INT_SOURCE_REG_M` are passed to trigger handler func
 
 Additionally `MAG_INT_BIT_THRS_OFFSET` can be combined with mentioned values to configure if interrupt threshold detection uses hard-iron offset correction to discover interrupt.
 
-Value of interrupt configuration can be put in correct location in `sensor_trigger` member `type` using macro `TRIGGER_BITS_SET()`. As for example: `TRIG_MAG_INT | TRIGGER_BITS_SET(MAG_INT_THRS_DEFAULT | MAG_INT_BIT_THRS_OFFSET)` would enable magnetometer interrupt configuration with hard-iron offset correction.
+Interrupt configuration can be put in correct location in `sensor_trigger` member `type` using macro `TRIGGER_BITS_SET()`. As for example: `TRIG_MAG_INT | TRIGGER_BITS_SET(MAG_INT_THRS_DEFAULT | MAG_INT_BIT_THRS_OFFSET)` would enable magnetometer interrupt configuration with hard-iron offset correction.
 
 In trigger handler function macro `TRIGGER_SRC_GET()` can be used to get interrupt source register value from `sensor_trigger` member `type`. This applies both to accelerometer (`TRIG_ACC_INT1`, `TRIG_ACC_INT1`) and magnetometer (`TRIG_MAG_INT`) interrupts.
 
