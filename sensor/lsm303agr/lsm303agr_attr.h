@@ -124,24 +124,20 @@ extern "C"
         MAG_ODR_100Hz = 100,
     };
 
+// bits to activate INT1, INT2, polling interrupts
 #define BIT_ACC_INT_CLICK BIT(7)
 #define BIT_ACC_INT_AOI1 BIT(6)
 #define BIT_ACC_INT_AOI2 BIT(5)
 #define BIT_ACC_INT_ACT BIT(3)
 #define BIT_ACC_INT_FIFO_WTM BIT(2)
 #define BIT_ACC_INT_FIFO_OVR BIT(1)
+// bits to activate magnetometer polling interrupt
+#define BIT_MAG_INT_POLL BIT(4)
+#define BIT_MAG_THRS_OFFSET BIT(0)
 
 #define ALLOW_BITS_ACC_INT1 (BIT_ACC_INT_CLICK | BIT_ACC_INT_AOI1 | BIT_ACC_INT_AOI2 | BIT_ACC_INT_FIFO_WTM | BIT_ACC_INT_FIFO_OVR)
 #define ALLOW_BITS_ACC_INT2 (BIT_ACC_INT_CLICK | BIT_ACC_INT_AOI1 | BIT_ACC_INT_AOI2 | BIT_ACC_INT_ACT)
-#define ALLOW_BITS_ALL ~(BIT(0))
-
-#define BIT_POLL_INT_CLICK BIT(7)
-#define BIT_POLL_INT_AOI1 BIT(6)
-#define BIT_POLL_INT_AOI2 BIT(5)
-#define BIT_POLL_INT_FIFO_WTM BIT(4)
-#define BIT_POLL_INT_FIFO_OVR BIT(3)
-#define BIT_POLL_INT_MAG BIT(2)
-#define BIT_POLL_MAG_THRS_OFFSET BIT(1)
+#define ALLOW_BITS_POLL (BIT_ACC_INT_CLICK | BIT_ACC_INT_AOI1 | BIT_ACC_INT_AOI2 | BIT_ACC_INT_FIFO_WTM | BIT_ACC_INT_FIFO_OVR | BIT_MAG_INT_POLL);
 
 #define TRIGGER_BITS_SET(x) (x << 8)
 #define TRIGGER_BITS_GET(x) (x & 0x00FF)
@@ -172,7 +168,7 @@ extern "C"
 #define ACC_FIFO_ON_INT1 0xC0
 #define ACC_FIFO_ON_INT2 0xE0
 
-    // magnetometer interrupt configuration
+    // magnetometer INT_MAG interrupt configuration
     enum lsm303agr_mag_int
     {
         MAG_INT_OFF,

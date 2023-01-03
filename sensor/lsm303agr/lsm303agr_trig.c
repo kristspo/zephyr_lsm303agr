@@ -7,39 +7,42 @@ LOG_MODULE_DECLARE(lsm303agr, CONFIG_SENSOR_LOG_LEVEL);
 #include "lsm303agr_reg.h"
 
 void lsm303agr_acc_interrupt(lsm303agr_trig *trigger,
-                             const enum lsm303agr_int interrupt,
+                             uint8_t interrupt,
                              const struct device *dev)
 {
     const struct lsm303agr_config *cfg = dev->config;
     struct lsm303agr_data *data = dev->data;
     struct sensor_trigger resp;
     resp.chan = SENSOR_CHAN_ACCEL_XYZ;
-    resp.type = trigger->enable;
+    resp.type = interrupt;
 
     // read interrupt source register
     uint8_t src_reg, src_bits;
     uint8_t poll_bits = BIT(6); // polled interrupt active bit(s) in SRC register
+    bool fifo_interrupt = (interrupt & (BIT_ACC_INT_FIFO_WTM | BIT_ACC_INT_FIFO_OVR));
     switch (interrupt)
     {
-    case INT_CLICK:
+    case BIT_ACC_INT_CLICK:
         src_reg = LSM303AGR_CLICK_SRC_A;
         break;
-    case INT_AOI_1:
+    case BIT_ACC_INT_AOI1:
         src_reg = LSM303AGR_INT1_SRC_A;
         break;
-    case INT_AOI_2:
+    case BIT_ACC_INT_AOI2:
         src_reg = LSM303AGR_INT2_SRC_A;
         break;
-    case INT_FIFO:
+    default:
+        if (fifo_interrupt)
+        {
         src_reg = LSM303AGR_FIFO_SRC_REG_A;
-        poll_bits = ((trigger->enable & BIT_POLL_INT_FIFO_WTM) ? BIT(7) : 0) | ((trigger->enable & BIT_POLL_INT_FIFO_OVR) ? BIT(6) : 0);
-        break;
-    default: // no interrupt source register for INT_ACT
-        src_reg = 0x00;
+            poll_bits = ((interrupt & BIT_ACC_INT_FIFO_WTM) ? BIT(7) : 0) | ((interrupt & BIT_ACC_INT_FIFO_OVR) ? BIT(6) : 0);
+        }
+        else
+            src_reg = 0x00; // no interrupt source register for BIT_ACC_INT_ACT
     }
 
 #ifdef CONFIG_LSM303AGR_INTERRUPT_POLLING
-    bool call_handler = false;
+    bool call_handler = (interrupt & BIT_ACC_INT_ACT);
     if (src_reg)
     {
         int status = lsm303agr_read_reg(&cfg->i2c_acc, src_reg, &src_bits, 1);
@@ -48,20 +51,26 @@ void lsm303agr_acc_interrupt(lsm303agr_trig *trigger,
             // PRINT("interrupt src register 0x%02x : 0x%02x \n", src_reg, src_bits);
             if (trigger->enable & 0x01) // poll interrupt source register
             {
-                const uint8_t trig_bits = poll_bits & src_bits; // bits of polled and set interrupt SRC
-                const uint8_t mark_bits = ((interrupt == INT_FIFO) ? trig_bits : BIT(interrupt));
+                uint8_t trig_bits = poll_bits & src_bits; // polled and active interrupt SRC bit(s)
                 if (trig_bits)
                 {
-                    if (!(trigger->active & mark_bits))
+                    if (fifo_interrupt)
                     {
-                        trigger->active |= mark_bits;
-                        resp.type &= ALLOW_BITS_ALL;
+                        // check for active FIFO interrupt type
+                        if ((trig_bits & BIT(7)) == 0)
+                            interrupt &= ~BIT_ACC_INT_FIFO_WTM;
+                        if ((trig_bits & BIT(6)) == 0)
+                            interrupt &= ~BIT_ACC_INT_FIFO_OVR;
+                    }
+                    if (!(trigger->active & interrupt))
+                    {
+                        trigger->active |= interrupt;
                         call_handler = true;
                     }
                 }
                 else
                 {
-                    trigger->active &= ((interrupt == INT_FIFO) ? ~poll_bits : ~mark_bits);
+                    trigger->active &= ~interrupt;
                     return;
                 }
             }
@@ -69,7 +78,7 @@ void lsm303agr_acc_interrupt(lsm303agr_trig *trigger,
                 call_handler = true;
 
             resp.type |= TRIGGER_BITS_SET(src_bits);
-            if (src_reg == LSM303AGR_FIFO_SRC_REG_A)
+            if (fifo_interrupt)
             {
                 data->fifo_size = (src_bits & 0x1F);
                 data->status.fifo_ready = true;
@@ -118,22 +127,21 @@ void lsm303agr_mag_interrupt(lsm303agr_trig *trigger,
         if (trigger->enable & 0x01) // poll interrupt source register
         {
             const uint8_t poll_bit = BIT(0); // interrupt active bit in SOURCE register
-            const uint8_t mark_bit = BIT(INT_MAG);
             if (poll_bit & src_bits)
             {
-                if (trigger->active & mark_bit)
+                if (trigger->active & BIT_MAG_INT_POLL)
                 {
                     return;
                 }
                 else
                 {
-                    trigger->active |= mark_bit;
-                    resp.type &= ALLOW_BITS_ALL;
+                    trigger->active |= BIT_MAG_INT_POLL;
+                    resp.type = BIT_MAG_INT_POLL;
                 }
             }
             else
             {
-                trigger->active &= ~mark_bit;
+                trigger->active &= ~BIT_MAG_INT_POLL;
                 return;
             }
         }
@@ -183,16 +191,16 @@ void lsm303agr_poll_work_cb(struct k_work *poll_work)
 {
     struct lsm303agr_data *data = CONTAINER_OF(poll_work, struct lsm303agr_data, poll_work);
 
-    if (data->poll_int.enable & BIT_POLL_INT_CLICK)
-        lsm303agr_acc_interrupt(&data->poll_int, INT_CLICK, data->dev);
-    if (data->poll_int.enable & BIT_POLL_INT_AOI1)
-        lsm303agr_acc_interrupt(&data->poll_int, INT_AOI_1, data->dev);
-    if (data->poll_int.enable & BIT_POLL_INT_AOI2)
-        lsm303agr_acc_interrupt(&data->poll_int, INT_AOI_2, data->dev);
-    if (data->poll_int.enable & BIT_POLL_INT_MAG)
+    if (data->poll_int.enable & BIT_ACC_INT_CLICK)
+        lsm303agr_acc_interrupt(&data->poll_int, BIT_ACC_INT_CLICK, data->dev);
+    if (data->poll_int.enable & BIT_ACC_INT_AOI1)
+        lsm303agr_acc_interrupt(&data->poll_int, BIT_ACC_INT_AOI1, data->dev);
+    if (data->poll_int.enable & BIT_ACC_INT_AOI2)
+        lsm303agr_acc_interrupt(&data->poll_int, BIT_ACC_INT_AOI2, data->dev);
+    if (data->poll_int.enable & BIT_MAG_INT_POLL)
         lsm303agr_mag_interrupt(&data->poll_int, data->dev);
-    if (data->poll_int.enable & (BIT_POLL_INT_FIFO_WTM | BIT_POLL_INT_FIFO_OVR))
-        lsm303agr_acc_interrupt(&data->poll_int, INT_FIFO, data->dev);
+    if (data->poll_int.enable & (BIT_ACC_INT_FIFO_WTM | BIT_ACC_INT_FIFO_OVR))
+        lsm303agr_acc_interrupt(&data->poll_int, data->poll_int.enable & (BIT_ACC_INT_FIFO_WTM | BIT_ACC_INT_FIFO_OVR), data->dev);
 }
 #endif
 
@@ -204,26 +212,26 @@ void lsm303agr_work_cb(struct k_work *work)
     {
         data->status.acc_int1 = 0;
         if (data->acc_int1.enable & BIT_ACC_INT_CLICK)
-            lsm303agr_acc_interrupt(&data->acc_int1, INT_CLICK, data->dev);
+            lsm303agr_acc_interrupt(&data->acc_int1, BIT_ACC_INT_CLICK, data->dev);
         else if (data->acc_int1.enable & BIT_ACC_INT_AOI1)
-            lsm303agr_acc_interrupt(&data->acc_int1, INT_AOI_1, data->dev);
+            lsm303agr_acc_interrupt(&data->acc_int1, BIT_ACC_INT_AOI1, data->dev);
         else if (data->acc_int1.enable & BIT_ACC_INT_AOI2)
-            lsm303agr_acc_interrupt(&data->acc_int1, INT_AOI_2, data->dev);
+            lsm303agr_acc_interrupt(&data->acc_int1, BIT_ACC_INT_AOI2, data->dev);
         else if (data->acc_int1.enable & (BIT_ACC_INT_FIFO_WTM | BIT_ACC_INT_FIFO_OVR))
-            lsm303agr_acc_interrupt(&data->acc_int1, INT_FIFO, data->dev);
+            lsm303agr_acc_interrupt(&data->acc_int1, data->acc_int1.enable & (BIT_ACC_INT_FIFO_WTM | BIT_ACC_INT_FIFO_OVR), data->dev);
     }
 
     if (data->status.acc_int2)
     {
         data->status.acc_int2 = 0;
         if (data->acc_int2.enable & BIT_ACC_INT_CLICK)
-            lsm303agr_acc_interrupt(&data->acc_int2, INT_CLICK, data->dev);
+            lsm303agr_acc_interrupt(&data->acc_int2, BIT_ACC_INT_CLICK, data->dev);
         else if (data->acc_int2.enable & BIT_ACC_INT_AOI1)
-            lsm303agr_acc_interrupt(&data->acc_int2, INT_AOI_1, data->dev);
+            lsm303agr_acc_interrupt(&data->acc_int2, BIT_ACC_INT_AOI1, data->dev);
         else if (data->acc_int2.enable & BIT_ACC_INT_AOI2)
-            lsm303agr_acc_interrupt(&data->acc_int2, INT_AOI_2, data->dev);
+            lsm303agr_acc_interrupt(&data->acc_int2, BIT_ACC_INT_AOI2, data->dev);
         else if (data->acc_int2.enable & BIT_ACC_INT_ACT)
-            lsm303agr_acc_interrupt(&data->acc_int2, INT_ACT, data->dev);
+            lsm303agr_acc_interrupt(&data->acc_int2, BIT_ACC_INT_ACT, data->dev);
     }
 
     if (data->status.mag_int0)
@@ -324,14 +332,14 @@ int lsm303agr_polling_init(const struct device *dev,
     lsm303agr_int_crtl_reg_m_t ctrl_reg;
     int status;
 
-    if ((enable & (BIT_POLL_INT_FIFO_WTM | BIT_POLL_INT_FIFO_OVR)) && !(data->poll_int.enable & (BIT_POLL_INT_FIFO_WTM | BIT_POLL_INT_FIFO_OVR)))
+    if ((enable & (BIT_ACC_INT_FIFO_WTM | BIT_ACC_INT_FIFO_OVR)) && !(data->poll_int.enable & (BIT_ACC_INT_FIFO_WTM | BIT_ACC_INT_FIFO_OVR)))
     {
         data->status.fifo_ready = false;
         status = lsm303agr_fifo_set(&cfg->i2c_acc, true);
         if (status < 0)
             return status;
     }
-    if (!(enable & (BIT_POLL_INT_FIFO_WTM | BIT_POLL_INT_FIFO_OVR)) && (data->poll_int.enable & (BIT_POLL_INT_FIFO_WTM | BIT_POLL_INT_FIFO_OVR)))
+    if (!(enable & (BIT_ACC_INT_FIFO_WTM | BIT_ACC_INT_FIFO_OVR)) && (data->poll_int.enable & (BIT_ACC_INT_FIFO_WTM | BIT_ACC_INT_FIFO_OVR)))
     {
         data->status.fifo_ready = false;
         status = lsm303agr_fifo_set(&cfg->i2c_acc, false);
@@ -339,10 +347,10 @@ int lsm303agr_polling_init(const struct device *dev,
             return status;
     }
 
-    if ((enable & BIT_POLL_INT_MAG) && !(data->poll_int.enable & BIT_POLL_INT_MAG))
+    if ((enable & BIT_MAG_INT_POLL) && !(data->poll_int.enable & BIT_MAG_INT_POLL))
     {
         // update magnetometer CGF_REG_B_M INT_ON_DATAOFF bit
-        status = lsm303agr_mag_offset_int_conf_set(&cfg->i2c_mag, (enable & BIT_POLL_MAG_THRS_OFFSET) ? 1 : 0);
+        status = lsm303agr_mag_offset_int_conf_set(&cfg->i2c_mag, (enable & BIT_MAG_THRS_OFFSET) ? 1 : 0);
         if (status < 0)
             return status;
         // update magnetometer INT_CTRL_REG_M IEA, IEL, IEN bits
@@ -356,7 +364,7 @@ int lsm303agr_polling_init(const struct device *dev,
         if (status < 0)
             return status;
     }
-    if (!(enable & BIT_POLL_INT_MAG) && (data->poll_int.enable & BIT_POLL_INT_MAG))
+    if (!(enable & BIT_MAG_INT_POLL) && (data->poll_int.enable & BIT_MAG_INT_POLL))
     {
         // clear magnetometer INT_CTRL_REG_M IEN bit
         status = lsm303agr_mag_int_gen_conf_get(&cfg->i2c_mag, &ctrl_reg);
@@ -368,6 +376,7 @@ int lsm303agr_polling_init(const struct device *dev,
             return status;
     }
 
+    enable &= ALLOW_BITS_POLL;
     data->poll_int.active = 0x00;
     data->poll_int.enable = enable | 0x01; // mark this as polling interrupt
     data->poll_int.handler = handler;

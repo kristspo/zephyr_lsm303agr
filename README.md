@@ -1,21 +1,36 @@
 
+### 03 Jan 2023
+
+Update INT1, INT2 and polling triggers to use common bit defines for interrupt type. When trigger callback function is called bit that corresponds to interrupt processed is set in `sensor_trigger` member `type`.
+
+Following bit defines are updated to enable `TRIG_ACC_INT1`, `TRIG_ACC_INT2` and `TRIG_POLLING` trigger type: \
+`BIT_ACC_INT_CLICK` \
+`BIT_ACC_INT_AOI1` \
+`BIT_ACC_INT_AOI2` \
+`BIT_ACC_INT_ACT` (can be used only with `TRIG_ACC_INT2` trigger) \
+`BIT_ACC_INT_FIFO_WTM` (can be used only with `TRIG_ACC_INT1` trigger) \
+`BIT_ACC_INT_FIFO_OVR` (can be used only with `TRIG_ACC_INT1` trigger) \
+`BIT_MAG_INT_POLL` (can be used only with `TRIG_POLLING` trigger) \
+`BIT_MAG_THRS_OFFSET` (can be combined with `BIT_MAG_INT_POLL` to configure if interrupt threshold detection uses hard-iron offset correction value)
+
 ### 28 Dec 2022
 
 Add `sensor_trigger_set` to use polling trigger without using hardware gpio line. Polling trigger is enabled using trigger type `TRIG_POLLING` and enable bits that define interrupt source. Multiple source bits can be set. Channel `SENSOR_CHAN_ACCEL_XYZ` or `SENSOR_CHAN_MAGN_XYZ` can be used to enable polling trigger with same effect.
 
-Following bit defines are added to set polling trigger type: \
+~~Following bit defines are added to set polling trigger type: \
 `BIT_POLL_INT_CLICK` \
 `BIT_POLL_INT_AOI1` \
 `BIT_POLL_INT_AOI2` \
 `BIT_POLL_INT_FIFO_WTM` \
 `BIT_POLL_INT_FIFO_OVR` \
-`BIT_POLL_INT_MAG`
+`BIT_POLL_INT_MAG`~~
 
-Additionally `BIT_POLL_INT_MAG` can be combined with `BIT_POLL_MAG_THRS_OFFSET` to configure if interrupt threshold detection uses hard-iron offset correction value.
+~~Additionally `BIT_POLL_INT_MAG` can be combined with `BIT_POLL_MAG_THRS_OFFSET` to configure if interrupt threshold detection uses hard-iron offset correction value.~~
 
-Interrupt enable bits can be put in correct location in `sensor_trigger` member `type` using macro `TRIGGER_BITS_SET()`. As for example: `TRIG_POLLING | TRIGGER_BITS_SET(BIT_POLL_INT_AOI1 | BIT_POLL_INT_MAG)`.
+Interrupt enable bits can be put in correct location in `sensor_trigger` member `type` using macro `TRIGGER_BITS_SET()`. As for example: `TRIG_POLLING | TRIGGER_BITS_SET(BIT_POLL_INT_AOI1 | BIT_MAG_INT_POLL)`.
 
-**Kconfig options added to configure polling trigger support:** \
+**Kconfig options added to configure polling trigger support:**
+
 `CONFIG_LSM303AGR_INTERRUPT_POLLING` (must be enabled to use polling interrupts) \
 `CONFIG_LSM303AGR_INTERRUPT_POLL_INTERVAL` (sets interrupt polling interval in ms, default 50 ms if not configured)
 

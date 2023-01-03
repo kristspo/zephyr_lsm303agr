@@ -92,16 +92,6 @@ typedef struct lsm303agr_reg_type
     bool write;
 } lsm303agr_reg;
 
-enum lsm303agr_int
-{
-    INT_CLICK,
-    INT_AOI_1,
-    INT_AOI_2,
-    INT_ACT,
-    INT_MAG,
-    INT_FIFO,
-};
-
 int lsm303agr_attr_get(const struct device *dev,
                        enum sensor_channel chan,
                        enum sensor_attribute attr,

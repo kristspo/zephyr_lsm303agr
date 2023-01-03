@@ -807,7 +807,7 @@ int lsm303agr_trigger_set(const struct device *dev,
     int status;
 
     uint16_t trig_type = (trig->type & 0x00FF);
-    uint8_t trig_bits = (trig->type >> 8) & ALLOW_BITS_ALL;
+    uint8_t trig_bits = (trig->type >> 8);
 
     switch (trig->chan)
     {
@@ -838,6 +838,7 @@ int lsm303agr_trigger_set(const struct device *dev,
                     }
 
                     // set INT1 configuration register
+                    trig_bits &= ALLOW_BITS_ACC_INT1;
                     status = lsm303agr_write_reg(&cfg->i2c_acc, LSM303AGR_CTRL_REG3_A, &trig_bits, 1);
                     if (status < 0)
                         return status;
@@ -866,6 +867,7 @@ int lsm303agr_trigger_set(const struct device *dev,
                 if ((trig_bits == 0x00) || (trig_bits & ALLOW_BITS_ACC_INT2))
                 {
                     // set INT2 configuration register
+                    trig_bits &= ALLOW_BITS_ACC_INT2;
                     status = lsm303agr_write_reg(&cfg->i2c_acc, LSM303AGR_CTRL_REG6_A, &trig_bits, 1);
                     if (status < 0)
                         return status;
