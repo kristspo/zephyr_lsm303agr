@@ -8,8 +8,8 @@ Following bit defines are updated to enable `TRIG_ACC_INT1`, `TRIG_ACC_INT2` and
 `BIT_ACC_INT_AOI1` \
 `BIT_ACC_INT_AOI2` \
 `BIT_ACC_INT_ACT` (can be used only with `TRIG_ACC_INT2` trigger) \
-`BIT_ACC_INT_FIFO_WTM` (can be used only with `TRIG_ACC_INT1` trigger) \
-`BIT_ACC_INT_FIFO_OVR` (can be used only with `TRIG_ACC_INT1` trigger) \
+`BIT_ACC_INT_FIFO_WTM` (can be used with `TRIG_ACC_INT1` and `TRIG_POLLING` trigger) \
+`BIT_ACC_INT_FIFO_OVR` (can be used with `TRIG_ACC_INT1` and `TRIG_POLLING` trigger) \
 `BIT_MAG_INT_POLL` (can be used only with `TRIG_POLLING` trigger) \
 `BIT_MAG_THRS_OFFSET` (can be combined with `BIT_MAG_INT_POLL` to configure if interrupt threshold detection uses hard-iron offset correction value)
 
