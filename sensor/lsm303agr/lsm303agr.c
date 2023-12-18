@@ -1096,7 +1096,11 @@ int lsm303agr_init(const struct device *dev)
     data->status.mag_single_shot = (bool)cfg_reg_a.cfg_reg_a_m.md;
     data->status.mag_rate = cfg_reg_a.cfg_reg_a_m.odr;
 
+#ifdef CONFIG_LSM303AGR_INTERRUPT_POLLING
+    if (true)
+#else
     if (cfg->gpio_acc_int1.port || cfg->gpio_acc_int2.port || cfg->gpio_mag_int0.port)
+#endif
     {
         status = lsm303agr_init_gpios(dev);
         if (status < 0)
