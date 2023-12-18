@@ -147,4 +147,9 @@ config LSM303AGR_MAG_ODR_100HZ
 
 endchoice
 
+# Disable magnetometer part completely
+config LSM303AGR_MAG_DISABLE
+	bool "Disable magnetometer part"
+	default n
+
 endif # LSM303AGR

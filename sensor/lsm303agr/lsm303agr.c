@@ -476,6 +476,7 @@ int lsm303agr_attr_get(const struct device *dev,
         }
         break;
 
+#ifndef CONFIG_LSM303AGR_MAG_DISABLE
     case SENSOR_CHAN_MAGN_X:
     case SENSOR_CHAN_MAGN_Y:
     case SENSOR_CHAN_MAGN_Z:
@@ -497,6 +498,7 @@ int lsm303agr_attr_get(const struct device *dev,
             }
         }
         break;
+#endif
 
     default:
         return -ENOTSUP;
@@ -532,6 +534,7 @@ int lsm303agr_attr_set(const struct device *dev,
                 return lsm303agr_write_reg(&cfg->i2c_acc, reg.addr, (uint8_t *)&val->val1, 1);
         }
 
+#ifndef CONFIG_LSM303AGR_MAG_DISABLE
     case SENSOR_CHAN_MAGN_X:
     case SENSOR_CHAN_MAGN_Y:
     case SENSOR_CHAN_MAGN_Z:
@@ -546,6 +549,7 @@ int lsm303agr_attr_set(const struct device *dev,
             else
                 return lsm303agr_write_reg(&cfg->i2c_mag, reg.addr, (uint8_t *)&val->val1, 1);
         }
+#endif
 
     default:
         return -ENOTSUP;
@@ -627,6 +631,7 @@ int lsm303agr_channel_get(const struct device *dev,
         read_end_a = 2;
         break;
 
+#ifndef CONFIG_LSM303AGR_MAG_DISABLE
     case SENSOR_CHAN_MAGN_X:
         read_mag = true;
         read_start_m = read_end_m = 0;
@@ -647,6 +652,7 @@ int lsm303agr_channel_get(const struct device *dev,
         read_start_m = 0;
         read_end_m = 2;
         break;
+#endif
 
     case SENSOR_CHAN_ALL:
         read_acc = read_mag = true;
@@ -666,6 +672,7 @@ int lsm303agr_channel_get(const struct device *dev,
             lsm303agr_acc_convert(data->acc_sample.xyz[z] >> 4, data->acc_conv_scale, &val->val1);
         }
     }
+#ifndef CONFIG_LSM303AGR_MAG_DISABLE
     if (read_mag)
     {
         for (int z = read_start_m; z <= read_end_m; z++, val++)
@@ -674,6 +681,7 @@ int lsm303agr_channel_get(const struct device *dev,
             val->val1 = (data->mag_sample.xyz[z] * 3) >> 1; // 1 LSB is 1.5 milli gauss
         }
     }
+#endif
 
     return 0;
 }
@@ -683,7 +691,6 @@ int lsm303agr_sample_fetch(const struct device *dev,
 {
     const struct lsm303agr_config *cfg = dev->config;
     struct lsm303agr_data *data = dev->data;
-    lsm303agr_sample raw_mag;
     bool newsample = true;
     int status;
 
@@ -712,10 +719,12 @@ int lsm303agr_sample_fetch(const struct device *dev,
         if (chan != SENSOR_CHAN_ALL)
             return newsample ? 0 : -ENODATA;
 
+#ifndef CONFIG_LSM303AGR_MAG_DISABLE
     case SENSOR_CHAN_MAGN_XYZ:
     case SENSOR_CHAN_MAGN_X:
     case SENSOR_CHAN_MAGN_Y:
     case SENSOR_CHAN_MAGN_Z:
+        lsm303agr_sample raw_mag;
         if (data->status.mag_single_shot)
         {
             status = lsm303agr_mag_operating_mode_set(&cfg->i2c_mag, LSM303AGR_SINGLE_TRIGGER);
@@ -757,6 +766,7 @@ int lsm303agr_sample_fetch(const struct device *dev,
             newsample = newsample && (data->mag_sample.status & BIT(3));
         }
         return newsample ? 0 : -ENODATA;
+#endif
 
     case SENSOR_CHAN_DIE_TEMP:
         // read internal temperature only if requested
@@ -1034,6 +1044,7 @@ int lsm303agr_init(const struct device *dev)
         return -EINVAL;
     }
 
+#ifndef CONFIG_LSM303AGR_MAG_DISABLE
     status = lsm303agr_mag_device_id_get(&cfg->i2c_mag, &id);
     if (status < 0)
         return status;
@@ -1043,6 +1054,7 @@ int lsm303agr_init(const struct device *dev)
         LOG_ERR("Unexpected chip ID: 0x%02x", id);
         return -EINVAL;
     }
+#endif
 
     /** Accelerometer initialization **/
 
@@ -1077,6 +1089,7 @@ int lsm303agr_init(const struct device *dev)
 
     /** Magnetometer initialization **/
 
+#ifndef CONFIG_LSM303AGR_MAG_DISABLE
     // Set soft reset bit
     status = lsm303agr_mag_reset_set(&cfg->i2c_mag, true);
     if (status < 0)
@@ -1095,6 +1108,7 @@ int lsm303agr_init(const struct device *dev)
 
     data->status.mag_single_shot = (bool)cfg_reg_a.cfg_reg_a_m.md;
     data->status.mag_rate = cfg_reg_a.cfg_reg_a_m.odr;
+#endif
 
 #ifdef CONFIG_LSM303AGR_INTERRUPT_POLLING
     if (true)
